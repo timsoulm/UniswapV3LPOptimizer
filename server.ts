@@ -29,7 +29,11 @@ router.get('/fetch', (req, res) => {
                     // Should also switch to a library like Big.js since native javascript numbers are imprecise
                     const lowerBinIndex = Math.floor(position.PRICE_LOWER_1_0_USD / BIN_WIDTH);
                     const upperBinIndex = Math.floor(position.PRICE_UPPER_1_0_USD / BIN_WIDTH) + 1;
+
+                    // The liquidity for this position will need to be spread out across the buckets that is covers.
+                    // Assuming this can be done linearly for now, though may need to read more on liquidity
                     const liquidityPerBin = position.LIQUIDITY_ADJ / (upperBinIndex - lowerBinIndex);
+
                     // Will currently cut off the bins are the UPPER_PRICE
                     for (let i = lowerBinIndex; i < Math.min(poolLiquiditySummary[position.POOL_NAME].binLiquidity.length, upperBinIndex); i++) {
                         if (!poolLiquiditySummary[position.POOL_NAME].binLiquidity[i]) {
