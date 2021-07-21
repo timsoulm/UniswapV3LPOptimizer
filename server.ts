@@ -39,7 +39,7 @@ router.get('/fetch', (req, res) => {
                     if (!poolLiquiditySummary[poolSummary.POOL_NAME]) {
                         poolLiquiditySummary[poolSummary.POOL_NAME] = {
                             binWidth: poolSummary.L7_STDDEV_PRICE_1_0 * BIN_WIDTH_PCT_OF_STD_DEV,
-                            binLiquidity: new Array(TOTAL_NUMBER_OF_BINS),
+                            binLiquidity: new Array(TOTAL_NUMBER_OF_BINS).fill(0),
                             rangeLiquidity: [],
                             priceMean: poolSummary.L7_MEAN_PRICE_1_0,
                             currentPrice: poolSummary.LATEST_PRICE_1_0,
@@ -57,13 +57,13 @@ router.get('/fetch', (req, res) => {
                     // Assuming this can be done linearly for now, though may need to read more on liquidity
                     const liquidityPerBin =
                         position.LIQUIDITY_ADJ /
-                        ((position.PRICE_UPPER_1_0_USD - position.PRICE_LOWER_1_0_USD) / poolLiquiditySummaryForPosition.binWidth);
+                        ((position.PRICE_UPPER_1_0 - position.PRICE_LOWER_1_0) / poolLiquiditySummaryForPosition.binWidth);
 
                     const lowerBinIndex =
-                        Math.floor(((position.PRICE_LOWER_1_0_USD - poolLiquiditySummaryForPosition.currentPrice)
+                        Math.floor(((position.PRICE_LOWER_1_0 - poolLiquiditySummaryForPosition.currentPrice)
                             / poolLiquiditySummaryForPosition.binWidth) + BINS_ABOVE_OR_BELOW_CENTER);
                     const upperBinIndex =
-                        Math.floor(((position.PRICE_UPPER_1_0_USD - poolLiquiditySummaryForPosition.currentPrice)
+                        Math.floor(((position.PRICE_UPPER_1_0 - poolLiquiditySummaryForPosition.currentPrice)
                             / poolLiquiditySummaryForPosition.binWidth) + BINS_ABOVE_OR_BELOW_CENTER);
 
                     // ignore these since the prices don't overlap with stddev range
@@ -125,8 +125,18 @@ router.get('/fetch', (req, res) => {
                         }
                     }
                 }
-                const top5ranges = poolLiquiditySummary['WBTC-USDC 3000 60'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 5);
-                console.log(top5ranges);
+                console.log(poolLiquiditySummary['WBTC-USDC 3000 60'].dailyVolume, poolLiquiditySummary['WBTC-USDC 3000 60'].feePercent, poolLiquiditySummary['WBTC-USDC 3000 60'].currentPrice);
+                const top5ranges1 = poolLiquiditySummary['WBTC-USDC 3000 60'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                console.log(top5ranges1);
+
+                console.log(poolLiquiditySummary['WBTC-USDC 500 10'].dailyVolume, poolLiquiditySummary['WBTC-USDC 500 10'].feePercent, poolLiquiditySummary['WBTC-USDC 500 10'].currentPrice);
+                const top5ranges2 = poolLiquiditySummary['WBTC-USDC 500 10'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                console.log(top5ranges2);
+
+                console.log(poolLiquiditySummary['USDC-WETH 3000 60'].dailyVolume, poolLiquiditySummary['USDC-WETH 3000 60'].feePercent, poolLiquiditySummary['USDC-WETH 3000 60'].currentPrice);
+                const top5ranges3 = poolLiquiditySummary['USDC-WETH 3000 60'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                console.log(top5ranges3);
+
                 res.sendStatus(200);
             } else {
                 res.sendStatus(400);
