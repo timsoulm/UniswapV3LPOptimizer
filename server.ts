@@ -21,6 +21,8 @@ const BINS_ABOVE_OR_BELOW_CENTER = (TOTAL_NUMBER_OF_BINS - 1) / 2;
 
 const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
+const LIQUIDITY_AMT_USD = 1000;
+
 router.get('/fetch', (req, res) => {
     // Will pull the mean, stddev for 'WBTC-USDC 3000 60' pool
     const poolSummaryFetch = fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest');
@@ -43,7 +45,6 @@ router.get('/fetch', (req, res) => {
                             rangeLiquidity: [],
                             priceMean: poolSummary.L7_MEAN_PRICE_1_0,
                             currentPrice: poolSummary.LATEST_PRICE_1_0,
-                            // need to invert these values for the calculation
                             token1_USD: poolSummary.TOKEN1_USD,
                             token0_USD: poolSummary.TOKEN0_USD,
                             priceStandardDeviation: poolSummary.L7_STDDEV_PRICE_1_0,
@@ -119,7 +120,8 @@ router.get('/fetch', (req, res) => {
                                 // Note that this is an early methodology which needs a lot of work to be able to map onto reality
                                 currentPriceProbabilityInRange: normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper),
                                 meanPriceProbabilityInRange: normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper),
-                                liquidityEfficiency: 0
+                                estimatedDailyFees: 0, // calculation is below
+                                estimatedAPY: 0,
                             };
 
                             // Solve the following system of equations to get amt0 and amt1
@@ -133,13 +135,13 @@ router.get('/fetch', (req, res) => {
                             //        ((1000 - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
                             //
                             //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
-                            const amt0 = (1000 * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
+                            const amt0 = (LIQUIDITY_AMT_USD * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
                                 (-Math.sqrt(rangeUpper) * Math.sqrt(currentPrice) * token1_USD * Math.sqrt(rangeLower) +
                                     Math.sqrt(rangeUpper) * currentPrice * token1_USD +
                                     Math.sqrt(rangeUpper) * token0_USD -
                                     Math.sqrt(currentPrice) * token0_USD
                                 )
-                            const amt1 = (1000 - amt0 * token0_USD) / token1_USD;
+                            const amt1 = (LIQUIDITY_AMT_USD - amt0 * token0_USD) / token1_USD;
 
                             // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
                             const positionLiquidity = Math.min(
@@ -147,9 +149,7 @@ router.get('/fetch', (req, res) => {
                                 amt1 / (Math.sqrt(currentPrice) - Math.sqrt(rangeLower))
                             );
 
-                            console.log(pool, currentPrice, amt0, token0_USD, amt1, token1_USD);
-
-                            rangeLiquidity.liquidityEfficiency =
+                            rangeLiquidity.estimatedDailyFees =
                                 ((rangeLiquidity.currentPriceProbabilityInRange + rangeLiquidity.meanPriceProbabilityInRange) / 2) *
                                 (positionLiquidity / rangeLiquidity.liquidity) *
                                 currentPool.dailyVolume *
@@ -157,22 +157,23 @@ router.get('/fetch', (req, res) => {
 
                             // TODO: fix bug where calculation sometimes comes out to NaN
                             // Maybe due to floating point precision in JS? Need to switch to Big.js anyway
-                            if (!isNaN(rangeLiquidity.liquidityEfficiency)) {
+                            if (!isNaN(rangeLiquidity.estimatedDailyFees)) {
+                                rangeLiquidity.estimatedAPY = (rangeLiquidity.estimatedDailyFees / LIQUIDITY_AMT_USD) * 365 * 100;
                                 currentPool.rangeLiquidity.push(rangeLiquidity);
                             }
                         }
                     }
                 }
                 console.log(poolLiquiditySummary['WBTC-USDC 3000 60'].dailyVolume, poolLiquiditySummary['WBTC-USDC 3000 60'].feePercent, poolLiquiditySummary['WBTC-USDC 3000 60'].currentPrice);
-                const top5ranges1 = poolLiquiditySummary['WBTC-USDC 3000 60'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                const top5ranges1 = poolLiquiditySummary['WBTC-USDC 3000 60'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
                 console.log(top5ranges1);
 
                 console.log(poolLiquiditySummary['WBTC-USDC 500 10'].dailyVolume, poolLiquiditySummary['WBTC-USDC 500 10'].feePercent, poolLiquiditySummary['WBTC-USDC 500 10'].currentPrice);
-                const top5ranges2 = poolLiquiditySummary['WBTC-USDC 500 10'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                const top5ranges2 = poolLiquiditySummary['WBTC-USDC 500 10'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
                 console.log(top5ranges2);
 
                 console.log(poolLiquiditySummary['USDC-WETH 3000 60'].dailyVolume, poolLiquiditySummary['USDC-WETH 3000 60'].feePercent, poolLiquiditySummary['USDC-WETH 3000 60'].currentPrice);
-                const top5ranges3 = poolLiquiditySummary['USDC-WETH 3000 60'].rangeLiquidity.sort((a, b) => b.liquidityEfficiency - a.liquidityEfficiency).slice(0, 1);
+                const top5ranges3 = poolLiquiditySummary['USDC-WETH 3000 60'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
                 console.log(top5ranges3);
 
                 res.sendStatus(200);

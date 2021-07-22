@@ -5,7 +5,8 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         liquidity: number,
         currentPriceProbabilityInRange: number,
         meanPriceProbabilityInRange: number,
-        liquidityEfficiency: number
+        estimatedDailyFees: number,
+        estimatedAPY: number
     }
     export type PoolLiquiditySummary = {
         [poolName: string]: {
