@@ -11,6 +11,8 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         [poolName: string]: {
             priceMean: number,
             currentPrice: number,
+            token1_USD: number,
+            token0_USD: number,
             priceStandardDeviation: number,
             binWidth: number,
             binLiquidity: number[],

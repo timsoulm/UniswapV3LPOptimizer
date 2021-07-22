@@ -43,6 +43,9 @@ router.get('/fetch', (req, res) => {
                             rangeLiquidity: [],
                             priceMean: poolSummary.L7_MEAN_PRICE_1_0,
                             currentPrice: poolSummary.LATEST_PRICE_1_0,
+                            // need to invert these values for the calculation
+                            token1_USD: poolSummary.TOKEN1_USD,
+                            token0_USD: poolSummary.TOKEN0_USD,
                             priceStandardDeviation: poolSummary.L7_STDDEV_PRICE_1_0,
                             dailyVolume: poolSummary.L7_SWAP_USD_AMOUNT_IN / 7,
                             feePercent: poolSummary.FEE_PERCENT
@@ -75,31 +78,35 @@ router.get('/fetch', (req, res) => {
                     const upperBinIndexInRange = Math.min(upperBinIndex, (TOTAL_NUMBER_OF_BINS - 1));
 
                     for (let i = lowerBinIndexInRange; i <= upperBinIndexInRange; i++) {
-                        if (!poolLiquiditySummary[position.POOL_NAME].binLiquidity[i]) {
-                            poolLiquiditySummary[position.POOL_NAME].binLiquidity[i] = liquidityPerBin;
+                        if (!poolLiquiditySummaryForPosition.binLiquidity[i]) {
+                            poolLiquiditySummaryForPosition.binLiquidity[i] = liquidityPerBin;
                         } else {
-                            poolLiquiditySummary[position.POOL_NAME].binLiquidity[i] += liquidityPerBin;
+                            poolLiquiditySummaryForPosition.binLiquidity[i] += liquidityPerBin;
                         }
                     }
                 });
 
                 for (const pool in poolLiquiditySummary) {
-                    const normalDistFromMeanPrice = new NormalDistribution(poolLiquiditySummary[pool].priceMean, poolLiquiditySummary[pool].priceStandardDeviation);
-                    const normalDistFromCurrentPrice = new NormalDistribution(poolLiquiditySummary[pool].currentPrice, poolLiquiditySummary[pool].priceStandardDeviation);
+                    const currentPool = poolLiquiditySummary[pool];
+                    const currentPrice = currentPool.currentPrice;
+                    const token1_USD = currentPool.token1_USD;
+                    const token0_USD = currentPool.token0_USD;
+                    const normalDistFromMeanPrice = new NormalDistribution(currentPool.priceMean, currentPool.priceStandardDeviation);
+                    const normalDistFromCurrentPrice = new NormalDistribution(currentPrice, currentPool.priceStandardDeviation);
 
                     // O(n^2) to get all the range liquidities for each pool distribution which is pretty expensive.
                     // Will take longer as a function of bin width getting smaller
-                    for (let rangeLowerBoundIndex = 0; rangeLowerBoundIndex < poolLiquiditySummary[pool].binLiquidity.length; rangeLowerBoundIndex++) {
+                    for (let rangeLowerBoundIndex = 0; rangeLowerBoundIndex < currentPool.binLiquidity.length; rangeLowerBoundIndex++) {
                         let cumulativeLiquidity = 0;
-                        for (let rangeUpperBoundIndex = rangeLowerBoundIndex; rangeUpperBoundIndex < poolLiquiditySummary[pool].binLiquidity.length; rangeUpperBoundIndex++) {
-                            cumulativeLiquidity += poolLiquiditySummary[pool].binLiquidity[rangeUpperBoundIndex];
+                        for (let rangeUpperBoundIndex = rangeLowerBoundIndex; rangeUpperBoundIndex < currentPool.binLiquidity.length; rangeUpperBoundIndex++) {
+                            cumulativeLiquidity += currentPool.binLiquidity[rangeUpperBoundIndex];
 
-                            const rangeLower = ((rangeLowerBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * poolLiquiditySummary[pool].binWidth) + poolLiquiditySummary[pool].currentPrice;
-                            const rangeUpper = ((rangeUpperBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * poolLiquiditySummary[pool].binWidth) + poolLiquiditySummary[pool].currentPrice;
+                            const rangeLower = ((rangeLowerBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * currentPool.binWidth) + currentPrice;
+                            const rangeUpper = ((rangeUpperBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * currentPool.binWidth) + currentPrice;
 
                             if (REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE
-                                && (rangeLower > poolLiquiditySummary[pool].currentPrice
-                                    || rangeUpper < poolLiquiditySummary[pool].currentPrice)) {
+                                && (rangeLower > currentPrice
+                                    || rangeUpper < currentPrice)) {
                                 continue;
                             }
 
@@ -115,13 +122,44 @@ router.get('/fetch', (req, res) => {
                                 liquidityEfficiency: 0
                             };
 
+                            // Solve the following system of equations to get amt0 and amt1
+                            // Eq1: amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) = amt1 / (sqrt(cprice) - sqrt(lower))
+                            // Eq2: amt0 * token0usd + amt1 * token1usd = total_lp_amt
+                            // 
+                            // Set total_lp_amt to be $1000
+                            // Eq2: amt1 = (1000 - amt0 * token0usd) / token1usd
+                            // Eq1 w/ substitution for amt1:
+                            //     amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) =
+                            //        ((1000 - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
+                            //
+                            //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
+                            const amt0 = (1000 * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
+                                (-Math.sqrt(rangeUpper) * Math.sqrt(currentPrice) * token1_USD * Math.sqrt(rangeLower) +
+                                    Math.sqrt(rangeUpper) * currentPrice * token1_USD +
+                                    Math.sqrt(rangeUpper) * token0_USD -
+                                    Math.sqrt(currentPrice) * token0_USD
+                                )
+                            const amt1 = (1000 - amt0 * token0_USD) / token1_USD;
+
+                            // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
+                            const positionLiquidity = Math.min(
+                                amt0 * (Math.sqrt(rangeUpper) * Math.sqrt(currentPrice)) / (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice)),
+                                amt1 / (Math.sqrt(currentPrice) - Math.sqrt(rangeLower))
+                            );
+
+                            console.log(pool, currentPrice, amt0, token0_USD, amt1, token1_USD);
+
                             rangeLiquidity.liquidityEfficiency =
                                 ((rangeLiquidity.currentPriceProbabilityInRange + rangeLiquidity.meanPriceProbabilityInRange) / 2) *
-                                (1 / rangeLiquidity.liquidity) *
-                                poolLiquiditySummary[pool].dailyVolume *
-                                poolLiquiditySummary[pool].feePercent * .01;
+                                (positionLiquidity / rangeLiquidity.liquidity) *
+                                currentPool.dailyVolume *
+                                currentPool.feePercent * .01;
 
-                            poolLiquiditySummary[pool].rangeLiquidity.push(rangeLiquidity);
+                            // TODO: fix bug where calculation sometimes comes out to NaN
+                            // Maybe due to floating point precision in JS? Need to switch to Big.js anyway
+                            if (!isNaN(rangeLiquidity.liquidityEfficiency)) {
+                                currentPool.rangeLiquidity.push(rangeLiquidity);
+                            }
                         }
                     }
                 }
