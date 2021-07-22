@@ -23,6 +23,8 @@ const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
 const LIQUIDITY_AMT_USD = 1000;
 
+const PROBABILITY_RANGE_CONFIDENCE = 2;
+
 router.get('/fetch', (req, res) => {
     // Will pull the mean, stddev for 'WBTC-USDC 3000 60' pool
     const poolSummaryFetch = fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest');
@@ -55,6 +57,9 @@ router.get('/fetch', (req, res) => {
                 });
 
                 poolPositions.forEach(position => {
+                    if (!(position.POOL_NAME in poolLiquiditySummary)) {
+                        return;
+                    }
                     const poolLiquiditySummaryForPosition = poolLiquiditySummary[position.POOL_NAME];
 
                     // The liquidity for this position will need to be spread out across the buckets that is covers.
@@ -150,7 +155,10 @@ router.get('/fetch', (req, res) => {
                             );
 
                             rangeLiquidity.estimatedDailyFees =
-                                ((rangeLiquidity.currentPriceProbabilityInRange + rangeLiquidity.meanPriceProbabilityInRange) / 2) *
+                                // take the average of the probabilities from current price and mean price, then raise to the confidence
+                                // exponent. The higher this exponent, the less confident we are that the price will actually
+                                // stay within the specified range
+                                ((rangeLiquidity.currentPriceProbabilityInRange + rangeLiquidity.meanPriceProbabilityInRange) / 2) ** PROBABILITY_RANGE_CONFIDENCE *
                                 (positionLiquidity / rangeLiquidity.liquidity) *
                                 currentPool.dailyVolume *
                                 currentPool.feePercent * .01;
@@ -164,17 +172,17 @@ router.get('/fetch', (req, res) => {
                         }
                     }
                 }
-                console.log(poolLiquiditySummary['WBTC-USDC 3000 60'].dailyVolume, poolLiquiditySummary['WBTC-USDC 3000 60'].feePercent, poolLiquiditySummary['WBTC-USDC 3000 60'].currentPrice);
-                const top5ranges1 = poolLiquiditySummary['WBTC-USDC 3000 60'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
-                console.log(top5ranges1);
 
-                console.log(poolLiquiditySummary['WBTC-USDC 500 10'].dailyVolume, poolLiquiditySummary['WBTC-USDC 500 10'].feePercent, poolLiquiditySummary['WBTC-USDC 500 10'].currentPrice);
-                const top5ranges2 = poolLiquiditySummary['WBTC-USDC 500 10'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
-                console.log(top5ranges2);
+                const topRanges = [];
+                for (const pool in poolLiquiditySummary) {
+                    const currentPool = poolLiquiditySummary[pool];
+                    topRanges.push({
+                        poolName: pool,
+                        optimalPosition: currentPool.rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1)
+                    });
+                }
 
-                console.log(poolLiquiditySummary['USDC-WETH 3000 60'].dailyVolume, poolLiquiditySummary['USDC-WETH 3000 60'].feePercent, poolLiquiditySummary['USDC-WETH 3000 60'].currentPrice);
-                const top5ranges3 = poolLiquiditySummary['USDC-WETH 3000 60'].rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1);
-                console.log(top5ranges3);
+                console.log(topRanges);
 
                 res.sendStatus(200);
             } else {
