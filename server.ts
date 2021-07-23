@@ -23,7 +23,12 @@ const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
 const LIQUIDITY_AMT_USD = 1000;
 
-const PROBABILITY_RANGE_CONFIDENCE = 3;
+const POOL_L7_LIQUIDITY_THRESHOLD = 3_500_000;
+const POOL_L1_LIQUIDITY_THRESHOLD = 500_000;
+
+function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: number) {
+    return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
+}
 
 router.get('/fetch', (req, res) => {
     // Will pull the mean, stddev for 'WBTC-USDC 3000 60' pool
@@ -40,6 +45,13 @@ router.get('/fetch', (req, res) => {
             const poolPositions = responseJsonValues[1];
             if (Array.isArray(poolSummaries) && Array.isArray(poolPositions)) {
                 poolSummaries.forEach(poolSummary => {
+
+                    // Set some pool volume requirements here to get a better idea of pools with
+                    // some stability
+                    if (poolSummary.L7_SWAP_USD_AMOUNT_IN < POOL_L7_LIQUIDITY_THRESHOLD
+                        || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_LIQUIDITY_THRESHOLD) {
+                        return;
+                    }
                     if (!poolLiquiditySummary[poolSummary.POOL_NAME]) {
                         poolLiquiditySummary[poolSummary.POOL_NAME] = {
                             binWidth: poolSummary.L7_STDDEV_PRICE_1_0 * BIN_WIDTH_PCT_OF_STD_DEV,
@@ -62,12 +74,6 @@ router.get('/fetch', (req, res) => {
                     }
                     const poolLiquiditySummaryForPosition = poolLiquiditySummary[position.POOL_NAME];
 
-                    // The liquidity for this position will need to be spread out across the buckets that is covers.
-                    // Assuming this can be done linearly for now, though may need to read more on liquidity
-                    const liquidityPerBin =
-                        position.LIQUIDITY_ADJ /
-                        ((position.PRICE_UPPER_1_0 - position.PRICE_LOWER_1_0) / poolLiquiditySummaryForPosition.binWidth);
-
                     const lowerBinIndex =
                         Math.floor(((position.PRICE_LOWER_1_0 - poolLiquiditySummaryForPosition.currentPrice)
                             / poolLiquiditySummaryForPosition.binWidth) + BINS_ABOVE_OR_BELOW_CENTER);
@@ -85,9 +91,9 @@ router.get('/fetch', (req, res) => {
 
                     for (let i = lowerBinIndexInRange; i <= upperBinIndexInRange; i++) {
                         if (!poolLiquiditySummaryForPosition.binLiquidity[i]) {
-                            poolLiquiditySummaryForPosition.binLiquidity[i] = liquidityPerBin;
+                            poolLiquiditySummaryForPosition.binLiquidity[i] = position.LIQUIDITY_ADJ;
                         } else {
-                            poolLiquiditySummaryForPosition.binLiquidity[i] += liquidityPerBin;
+                            poolLiquiditySummaryForPosition.binLiquidity[i] += position.LIQUIDITY_ADJ;
                         }
                     }
                 });
@@ -103,10 +109,7 @@ router.get('/fetch', (req, res) => {
                     // O(n^2) to get all the range liquidities for each pool distribution which is pretty expensive.
                     // Will take longer as a function of bin width getting smaller
                     for (let rangeLowerBoundIndex = 0; rangeLowerBoundIndex < currentPool.binLiquidity.length; rangeLowerBoundIndex++) {
-                        let cumulativeLiquidity = 0;
                         for (let rangeUpperBoundIndex = rangeLowerBoundIndex; rangeUpperBoundIndex < currentPool.binLiquidity.length; rangeUpperBoundIndex++) {
-                            cumulativeLiquidity += currentPool.binLiquidity[rangeUpperBoundIndex];
-
                             const rangeLower = ((rangeLowerBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * currentPool.binWidth) + currentPrice;
                             const rangeUpper = ((rangeUpperBoundIndex - BINS_ABOVE_OR_BELOW_CENTER) * currentPool.binWidth) + currentPrice;
 
@@ -115,19 +118,6 @@ router.get('/fetch', (req, res) => {
                                     || rangeUpper < currentPrice)) {
                                 continue;
                             }
-
-                            const rangeLiquidity: PoolRange = {
-                                rangeLower: rangeLower,
-                                rangeUpper: rangeUpper,
-                                liquidity: cumulativeLiquidity,
-                                // The goal here is to use the standard deviation (aka daily price volatility) to estimate
-                                // the probability of the price being in the range [a, b] along a normal distribution.
-                                // Note that this is an early methodology which needs a lot of work to be able to map onto reality
-                                currentPriceProbabilityInRange: normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper),
-                                meanPriceProbabilityInRange: normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper),
-                                estimatedDailyFees: 0, // calculation is below
-                                estimatedAPY: 0,
-                            };
 
                             // Solve the following system of equations to get amt0 and amt1
                             // Eq1: amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) = amt1 / (sqrt(cprice) - sqrt(lower))
@@ -153,21 +143,43 @@ router.get('/fetch', (req, res) => {
                                 amt1 / (Math.sqrt(currentPrice) - Math.sqrt(rangeLower))
                             );
 
-                            rangeLiquidity.estimatedDailyFees =
-                                // take the average of the probabilities from current price and mean price, then raise to the confidence
-                                // exponent. The higher this exponent, the less confident we are that the price will actually
-                                // stay within the specified range
-                                ((rangeLiquidity.currentPriceProbabilityInRange + rangeLiquidity.meanPriceProbabilityInRange) / 2) ** PROBABILITY_RANGE_CONFIDENCE *
-                                (positionLiquidity / rangeLiquidity.liquidity) *
+                            // TODO: fix bug where calculation sometimes comes out to NaN
+                            // Maybe due to floating point precision in JS? Need to switch to Big.js anyway
+                            // Same with liquidityCoverageExpectedValue below...
+                            if (isNaN(positionLiquidity)) {
+                                continue;
+                            }
+
+                            let liquidityCoverageExpectedValue = 0;
+                            for (let i = rangeLowerBoundIndex; i <= rangeUpperBoundIndex; i++) {
+                                const binLowerPrice = convertBinIndexToPrice(i, currentPool.binWidth, currentPrice);
+                                const binUpperPrice = convertBinIndexToPrice(i + 1, currentPool.binWidth, currentPrice);
+                                const currentPriceProbabilityInBin = normalDistFromCurrentPrice.probabilityBetween(binLowerPrice, binUpperPrice);
+                                const meanPriceProbabilityInBin = normalDistFromMeanPrice.probabilityBetween(binLowerPrice, binUpperPrice);
+                                const aggregateProbabilityInBin = (currentPriceProbabilityInBin + meanPriceProbabilityInBin) / 2;
+                                liquidityCoverageExpectedValue += (positionLiquidity / (currentPool.binLiquidity[i] + positionLiquidity)) * aggregateProbabilityInBin;
+                            }
+
+                            if (isNaN(liquidityCoverageExpectedValue)) {
+                                continue;
+                            }
+
+                            const estimatedDailyFees = liquidityCoverageExpectedValue *
                                 currentPool.dailyVolume *
                                 currentPool.feePercent * .01;
 
-                            // TODO: fix bug where calculation sometimes comes out to NaN
-                            // Maybe due to floating point precision in JS? Need to switch to Big.js anyway
-                            if (!isNaN(rangeLiquidity.estimatedDailyFees)) {
-                                rangeLiquidity.estimatedAPY = (rangeLiquidity.estimatedDailyFees / LIQUIDITY_AMT_USD) * 365 * 100;
-                                currentPool.rangeLiquidity.push(rangeLiquidity);
-                            }
+                            const rangeLiquidity: PoolRange = {
+                                rangeLower: rangeLower,
+                                rangeUpper: rangeUpper,
+                                probabilityPriceInRange:
+                                    (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
+                                        + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
+                                liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
+                                estimatedDailyFees: estimatedDailyFees,
+                                estimatedAPY: (estimatedDailyFees / LIQUIDITY_AMT_USD) * 365 * 100
+                            };
+
+                            currentPool.rangeLiquidity.push(rangeLiquidity);
                         }
                     }
                 }

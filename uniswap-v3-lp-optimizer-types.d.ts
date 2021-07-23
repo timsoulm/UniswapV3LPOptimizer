@@ -2,9 +2,8 @@ declare module 'uniswap-v3-lp-optimizer-types' {
     export type PoolRange = {
         rangeLower: number,
         rangeUpper: number,
-        liquidity: number,
-        currentPriceProbabilityInRange: number,
-        meanPriceProbabilityInRange: number,
+        probabilityPriceInRange: number,
+        liquidityCoverageExpectedValue: number,
         estimatedDailyFees: number,
         estimatedAPY: number
     }
