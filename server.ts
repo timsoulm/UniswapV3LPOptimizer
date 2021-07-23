@@ -23,7 +23,7 @@ const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
 const LIQUIDITY_AMT_USD = 1000;
 
-const PROBABILITY_RANGE_CONFIDENCE = 2;
+const PROBABILITY_RANGE_CONFIDENCE = 3;
 
 router.get('/fetch', (req, res) => {
     // Will pull the mean, stddev for 'WBTC-USDC 3000 60' pool
@@ -133,11 +133,10 @@ router.get('/fetch', (req, res) => {
                             // Eq1: amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) = amt1 / (sqrt(cprice) - sqrt(lower))
                             // Eq2: amt0 * token0usd + amt1 * token1usd = total_lp_amt
                             // 
-                            // Set total_lp_amt to be $1000
-                            // Eq2: amt1 = (1000 - amt0 * token0usd) / token1usd
+                            // Eq2: amt1 = (total_lp_amt - amt0 * token0usd) / token1usd
                             // Eq1 w/ substitution for amt1:
                             //     amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) =
-                            //        ((1000 - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
+                            //        ((total_lp_amt - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
                             //
                             //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
                             const amt0 = (LIQUIDITY_AMT_USD * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
@@ -145,7 +144,7 @@ router.get('/fetch', (req, res) => {
                                     Math.sqrt(rangeUpper) * currentPrice * token1_USD +
                                     Math.sqrt(rangeUpper) * token0_USD -
                                     Math.sqrt(currentPrice) * token0_USD
-                                )
+                                );
                             const amt1 = (LIQUIDITY_AMT_USD - amt0 * token0_USD) / token1_USD;
 
                             // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
@@ -173,16 +172,16 @@ router.get('/fetch', (req, res) => {
                     }
                 }
 
-                const topRanges = [];
+                const topRangePerPool = [];
                 for (const pool in poolLiquiditySummary) {
                     const currentPool = poolLiquiditySummary[pool];
-                    topRanges.push({
+                    topRangePerPool.push({
                         poolName: pool,
-                        optimalPosition: currentPool.rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY).slice(0, 1)
+                        optimalPosition: currentPool.rangeLiquidity.sort((a, b) => b.estimatedAPY - a.estimatedAPY)[0]
                     });
                 }
 
-                console.log(topRanges);
+                console.log(topRangePerPool);
 
                 res.sendStatus(200);
             } else {
