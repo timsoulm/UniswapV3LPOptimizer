@@ -26,7 +26,7 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
 }
 
-export async function fetchPositionCandidates(): Promise<PositionCandidate[] | null> {
+export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
     const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
         fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest'),
         fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
@@ -38,7 +38,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[] | n
     ]);
 
     if (!Array.isArray(poolSummaries) || !Array.isArray(poolPositions)) {
-        return null;
+        return [];
     }
 
     poolSummaries.forEach(poolSummary => {
@@ -171,7 +171,6 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[] | n
                         (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
                             + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
                     liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
-                    estimatedDailyFees: estimatedDailyFees,
                     estimatedAPY: (estimatedDailyFees / LIQUIDITY_AMT_USD) * 365 * 100
                 };
 
@@ -185,7 +184,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[] | n
         const currentPool = poolLiquiditySummary[pool];
         topRangePerPool.push({
             poolName: pool,
-            optimalPosition: currentPool.rangeLiquidity
+            ...currentPool.rangeLiquidity
                 .filter(a => a.probabilityPriceInRange >= MINIMUM_PROBABILITY_IN_RANGE)
                 .sort((a, b) => b.estimatedAPY - a.estimatedAPY)[0]
         });

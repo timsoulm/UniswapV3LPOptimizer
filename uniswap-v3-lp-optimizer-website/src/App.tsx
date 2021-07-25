@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { Column, useTable } from 'react-table'
 import './App.css';
 import { fetchPositionCandidates } from './position-candidate-calculation';
 import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
 
 
 function App() {
-  const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate> | null>(null);
+  const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
   useEffect(() => {
     async function asyncPositionCandidateWrapper() {
       const positionCandidates = await fetchPositionCandidates();
@@ -14,34 +15,85 @@ function App() {
     asyncPositionCandidateWrapper();
   }, []);
 
+  const data: Array<PositionCandidate> = useMemo(
+    () => positionCandidates, [positionCandidates]
+  );
+
+  const columns: Array<Column<PositionCandidate>> = useMemo(
+    () => [
+      {
+        Header: 'Pool Name',
+        accessor: 'poolName',
+      },
+      {
+        Header: 'Range Lower',
+        accessor: 'rangeLower',
+      },
+      {
+        Header: 'Range Upper',
+        accessor: 'rangeUpper',
+      },
+      {
+        Header: 'Probability Price In Range',
+        accessor: 'probabilityPriceInRange',
+      },
+      {
+        Header: 'Liquidity Coverage Expected Value',
+        accessor: 'liquidityCoverageExpectedValue',
+      },
+      {
+        Header: 'APY Expected Value',
+        accessor: 'estimatedAPY',
+      },
+    ],
+    []
+  );
+
+  const tableInstance = useTable({ columns, data });
+
+  if (data.length === 0) {
+    return <div>Finding optimal positions per pool... (this will take about 15 seconds)</div>;
+  }
+
+  const {
+    getTableProps,
+    getTableBodyProps,
+    headerGroups,
+    rows,
+    prepareRow,
+  } = tableInstance;
+
   return (
     <div>
-
-      {positionCandidates ? <table className="positionsTable">
+      <table {...getTableProps()} className="positionsTable">
         <thead>
-          <tr>
-            <th>Pool Name</th>
-            <th>Range Lower</th>
-            <th>Range Upper</th>
-            <th>Probability Price In Range</th>
-            <th>Liquidity Coverage Expected Value</th>
-            <th>APY Expected Value</th>
-          </tr>
+          {headerGroups.map(headerGroup => (
+            <tr {...headerGroup.getHeaderGroupProps()}>
+              {headerGroup.headers.map(column => (
+                <th {...column.getHeaderProps()}>
+                  {column.render('Header')}
+                </th>
+              ))}
+            </tr>
+          ))}
         </thead>
-        <tbody>
-          {positionCandidates.map(positionCandidate => {
+        <tbody {...getTableBodyProps()}>
+          {rows.map(row => {
+            prepareRow(row)
             return (
-              <tr key={positionCandidate.poolName}>
-                <td>{positionCandidate.poolName}</td>
-                <td>{positionCandidate.optimalPosition.rangeLower.toFixed(6)}</td>
-                <td>{positionCandidate.optimalPosition.rangeUpper.toFixed(6)}</td>
-                <td>{positionCandidate.optimalPosition.probabilityPriceInRange.toFixed(2)}</td>
-                <td>{positionCandidate.optimalPosition.liquidityCoverageExpectedValue.toFixed(6)}</td>
-                <td>{positionCandidate.optimalPosition.estimatedAPY.toFixed(2)}</td>
-              </tr>);
+              <tr {...row.getRowProps()}>
+                {row.cells.map(cell => {
+                  return (
+                    <td {...cell.getCellProps()}>
+                      {cell.render('Cell')}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
           })}
         </tbody>
-      </table> : <div>Loading positions... (this will take about 15 seconds)</div>}
+      </table>
     </div>
   );
 }
