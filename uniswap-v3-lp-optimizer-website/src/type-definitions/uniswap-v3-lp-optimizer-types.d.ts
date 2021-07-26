@@ -7,7 +7,8 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         estimatedAPY: number
     }
     export type PositionCandidate = PoolRange & {
-        poolName: string
+        poolName: string,
+        currentPrice: number
     }
     export type PoolLiquiditySummary = {
         [poolName: string]: {

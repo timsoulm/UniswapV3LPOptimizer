@@ -171,7 +171,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
                         (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
                             + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
                     liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
-                    estimatedAPY: (estimatedDailyFees / LIQUIDITY_AMT_USD) * 365 * 100
+                    estimatedAPY: (estimatedDailyFees / LIQUIDITY_AMT_USD) * 365
                 };
 
                 currentPool.rangeLiquidity.push(rangeLiquidity);
@@ -184,6 +184,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
         const currentPool = poolLiquiditySummary[pool];
         topRangePerPool.push({
             poolName: pool,
+            currentPrice: currentPool.currentPrice,
             ...currentPool.rangeLiquidity
                 .filter(a => a.probabilityPriceInRange >= MINIMUM_PROBABILITY_IN_RANGE)
                 .sort((a, b) => b.estimatedAPY - a.estimatedAPY)[0]
