@@ -103,6 +103,8 @@ function App() {
   return (
     <div>
       <h1>Uniswap V3 Optimal Position per Pool</h1>
+      <p>This tool is not investment advice, please use it at your own risk. It uses a point-in-time estimate of how much you could potentially earn in fees for providing liquidity in Uniswap V3 (similar to the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>). It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. Use it to make directionally decisions about investments, but past information makes no gaurantees about the future.</p>
+      <p>This is an open source project. For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
       {data.length === 0 ? <div className="table-loading-container">
         <div className="table-loading-text">Calculating optimal positions... (this can take up to 15 seconds)</div>
         <div className="sk-chase">
