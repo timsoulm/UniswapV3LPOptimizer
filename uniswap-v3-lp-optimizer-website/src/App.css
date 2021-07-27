@@ -74,6 +74,8 @@ h4 {
   color: #fff;
   border-radius: .4em;
   overflow: hidden;
+  table-layout: fixed;
+  width:100%;
 }
 .rwd-table tr {
   border-color: #46637f;
