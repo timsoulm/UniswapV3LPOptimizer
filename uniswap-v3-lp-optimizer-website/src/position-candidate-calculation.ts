@@ -4,7 +4,7 @@ import NormalDistribution from 'normal-distribution';
 const poolLiquiditySummary: PoolLiquiditySummary = {};
 
 // The number of standard deviations to analyze surrounding the target price (+/- 10)
-const PRICE_RANGE_NUM_OF_STD_DEVS = 20;
+const PRICE_RANGE_NUM_OF_STD_DEVS = 10;
 
 // The proportion of a standard deviation that a single bin represents
 const BIN_WIDTH_PCT_OF_STD_DEV = .25;
@@ -19,8 +19,8 @@ const MINIMUM_PROBABILITY_IN_RANGE = 0.1;
 
 const LIQUIDITY_AMT_USD = 1000;
 
-const POOL_L7_LIQUIDITY_THRESHOLD = 3_500_000;
-const POOL_L1_LIQUIDITY_THRESHOLD = 500_000;
+const POOL_L7_VOLUME_THRESHOLD = 3_500_000;
+const POOL_L1_VOLUME_THRESHOLD = 500_000;
 
 function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: number) {
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
@@ -44,8 +44,8 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
     poolSummaries.forEach(poolSummary => {
         // Set some pool volume requirements here to get a better idea of pools with
         // some stability
-        if (poolSummary.L7_SWAP_USD_AMOUNT_IN < POOL_L7_LIQUIDITY_THRESHOLD
-            || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_LIQUIDITY_THRESHOLD) {
+        if (poolSummary.L7_SWAP_USD_AMOUNT_IN < POOL_L7_VOLUME_THRESHOLD
+            || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_VOLUME_THRESHOLD) {
             return;
         }
         if (!poolLiquiditySummary[poolSummary.POOL_NAME]) {
