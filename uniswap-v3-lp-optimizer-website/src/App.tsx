@@ -120,7 +120,7 @@ function App() {
           </ul>
         </div>
         <div className="intro-liquidity-visualization-image">
-          <img src="liquidityVisualization.svg" />
+          <img src="liquidityVisualization.svg" alt="liquidity coverage calculation diagram" />
         </div>
 
       </div>
