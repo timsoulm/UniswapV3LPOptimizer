@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Column, useTable, useSortBy, useFilters, FilterProps, FilterValue, IdType, Row } from 'react-table'
+import { Column, useTable, useSortBy, useFilters, FilterProps, FilterValue, IdType, Row, usePagination } from 'react-table'
 import './App.css';
 import { fetchPositionCandidates } from './position-candidate-calculation';
 import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
@@ -175,16 +175,26 @@ function App() {
           id: 'estimatedAPY',
           value: 0
         },
-      ]
+      ],
+      pageSize: 10
     }
-  }, useFilters, useSortBy);
+  }, useFilters, useSortBy, usePagination);
 
   const {
     getTableProps,
     getTableBodyProps,
     headerGroups,
-    rows,
     prepareRow,
+    filteredRows,
+    page,
+    pageOptions,
+    pageCount,
+    state: { pageIndex },
+    gotoPage,
+    previousPage,
+    nextPage,
+    canPreviousPage,
+    canNextPage,
   } = tableInstance;
 
   return (
@@ -223,43 +233,62 @@ function App() {
             <div className="sk-chase-dot"></div>
           </div>
         </div> :
-          <table {...getTableProps()} className="rwd-table">
-            <thead>
-              {headerGroups.map(headerGroup => (
-                <tr {...headerGroup.getHeaderGroupProps()}>
-                  {headerGroup.headers.map(column => (
-                    <th {...column.getHeaderProps()}>
-                      <div className="table-header-container">
-                        <div {...column.getSortByToggleProps()}>
-                          {column.render('Header')}
-                          <span>
-                            {column.isSorted ? (column.isSortedDesc ? ' ▼' : ' ▲') : ''}
-                          </span>
+          <>
+            <h4>Showing <strong>{filteredRows.length}</strong> potential pool {filteredRows.length === 1 ? 'position' : 'positions'}</h4>
+            <table {...getTableProps()} className="rwd-table">
+              <thead>
+                {headerGroups.map(headerGroup => (
+                  <tr {...headerGroup.getHeaderGroupProps()}>
+                    {headerGroup.headers.map(column => (
+                      <th {...column.getHeaderProps()}>
+                        <div className="table-header-container">
+                          <div {...column.getSortByToggleProps()}>
+                            {column.render('Header')}
+                            <span>
+                              {column.isSorted ? (column.isSortedDesc ? ' ▼' : ' ▲') : ''}
+                            </span>
+                          </div>
+                          <div>{column.canFilter ? column.render('Filter') : null}</div>
                         </div>
-                        <div>{column.canFilter ? column.render('Filter') : null}</div>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody {...getTableBodyProps()}>
-              {rows.map(row => {
-                prepareRow(row)
-                return (
-                  <tr {...row.getRowProps()}>
-                    {row.cells.map(cell => {
-                      return (
-                        <td {...cell.getCellProps()}>
-                          {cell.render('Cell')}
-                        </td>
-                      );
-                    })}
+                      </th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </thead>
+              <tbody {...getTableBodyProps()}>
+                {page.map((row, i) => {
+                  prepareRow(row)
+                  return (
+                    <tr {...row.getRowProps()}>
+                      {row.cells.map(cell => {
+                        return <td {...cell.getCellProps()}>{cell.render('Cell')}</td>
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="table-pagination">
+              <button onClick={() => gotoPage(0)} disabled={!canPreviousPage}>
+                {'<<'}
+              </button>{' '}
+              <button onClick={() => previousPage()} disabled={!canPreviousPage}>
+                {'<'}
+              </button>{' '}
+              <button onClick={() => nextPage()} disabled={!canNextPage}>
+                {'>'}
+              </button>{' '}
+              <button onClick={() => gotoPage(pageCount - 1)} disabled={!canNextPage}>
+                {'>>'}
+              </button>{' '}
+              <span>
+                Page{' '}
+                <strong>
+                  {pageIndex + 1} of {pageOptions.length}
+                </strong>{' '}
+              </span>
+            </div>
+          </>
       }
     </div >
   );

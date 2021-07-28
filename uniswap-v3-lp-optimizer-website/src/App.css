@@ -122,6 +122,11 @@ h4 {
   margin-right: 1em;
 }
 
+.table-pagination {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
 
 /* Taken From MIT licenced project https://github.com/tobiasahlin/SpinKit */
 .sk-chase {
