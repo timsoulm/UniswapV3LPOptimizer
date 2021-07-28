@@ -102,7 +102,7 @@ h4 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 5em;
+  height: 6em;
 }
 
 .intro-container {
@@ -115,6 +115,11 @@ h4 {
 
 .intro-liquidity-visualization-image {
   width: 65%;
+}
+
+.slider-filter {
+  width: 5em;
+  margin-right: 1em;
 }
 
 

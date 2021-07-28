@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Column, useTable, useSortBy, useFilters, FilterProps } from 'react-table'
+import { Column, useTable, useSortBy, useFilters, FilterProps, FilterValue, IdType, Row } from 'react-table'
 import './App.css';
 import { fetchPositionCandidates } from './position-candidate-calculation';
 import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
@@ -26,6 +26,51 @@ function DefaultColumnFilter({
   )
 }
 
+function filterGreaterThan(rows: Array<Row<any>>, id: Array<IdType<any>>, filterValue: FilterValue) {
+  return rows.filter((row) => {
+    const rowValue = row.values[id[0]];
+    return rowValue >= filterValue;
+  });
+}
+
+function createFilterRange(isUpper: boolean) {
+  return function (rows: Array<Row<any>>, id: Array<IdType<any>>, filterValue: FilterValue) {
+    return rows.filter((row) => {
+      const rowValueRaw = row.values[id[0]];
+      const comparisonValue = row.values.currentPrice;
+      const rowValuePercent = (rowValueRaw - comparisonValue) / comparisonValue;
+      return isUpper ? rowValuePercent >= filterValue : rowValuePercent <= filterValue;
+    });
+  }
+}
+
+function CreateSliderColumnFilter(min: number, max: number, step: number, valueFormatter: (val: number) => string) {
+  return function ({
+    column: { filterValue, setFilter },
+  }: FilterProps<PositionCandidate>) {
+    return (
+      <>
+        <input
+          className="slider-filter"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={filterValue}
+          onChange={e => {
+            setFilter(parseFloat(e.target.value));
+          }}
+        />
+        <input
+          type="text"
+          value={valueFormatter(filterValue)}
+          size={6} />
+      </>
+    );
+  }
+}
+
+
 function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
   useEffect(() => {
@@ -42,7 +87,6 @@ function App() {
 
   const defaultColumn = useMemo(
     () => ({
-      // Let's set up our default Filter UI
       Filter: DefaultColumnFilter,
     }),
     []
@@ -59,42 +103,81 @@ function App() {
         accessor: 'currentPrice',
         Cell: props => props.value.toFixed(6),
         sortType: 'basic',
+        disableFilters: true
       },
       {
         Header: 'Range Lower',
         accessor: 'rangeLower',
         Cell: props => valueWithPercentDifferenceFromTarget(props.value, props.row.values.currentPrice),
-        sortType: 'basic'
+        sortType: 'basic',
+        Filter: CreateSliderColumnFilter(-.05, 0, 0.002, val => `<${(val * 100).toFixed(1)}%`),
+        filter: createFilterRange(false),
       },
       {
         Header: 'Range Upper',
         accessor: 'rangeUpper',
         Cell: props => valueWithPercentDifferenceFromTarget(props.value, props.row.values.currentPrice),
-        sortType: 'basic'
+        sortType: 'basic',
+        Filter: CreateSliderColumnFilter(0, .05, 0.002, val => `>${(val * 100).toFixed(1)}%`),
+        filter: createFilterRange(true),
       },
       {
         Header: 'Probability Price In Range',
         accessor: 'probabilityPriceInRange',
         Cell: props => formatAsPercent(props.value, 2),
-        sortType: 'basic'
+        sortType: 'basic',
+        Filter: CreateSliderColumnFilter(0, 1, 0.01, val => `>${(val * 100).toFixed(0)}%`),
+        filter: filterGreaterThan,
       },
       {
         Header: 'Liquidity Coverage Expected Value',
         accessor: 'liquidityCoverageExpectedValue',
         Cell: props => formatAsPercent(props.value, 4),
-        sortType: 'basic'
+        sortType: 'basic',
+        Filter: CreateSliderColumnFilter(0, 0.01, 0.001, val => `>${(val * 100).toFixed(2)}%`),
+        filter: filterGreaterThan,
       },
       {
         Header: 'APY Expected Value *** (See Disclaimer)',
         accessor: 'estimatedAPY',
         Cell: props => formatAsPercent(props.value, 2),
-        sortType: 'basic'
+        sortType: 'basic',
+        Filter: CreateSliderColumnFilter(0, 5, 0.1, val => `>${(val * 100).toFixed(0)}%`),
+        filter: filterGreaterThan,
       },
     ],
     []
   );
 
-  const tableInstance = useTable({ columns, data, defaultColumn }, useFilters, useSortBy);
+  const tableInstance = useTable({
+    columns,
+    data,
+    defaultColumn,
+    initialState: {
+      filters: [
+        {
+          id: 'rangeLower',
+          value: -0.01
+        },
+        {
+          id: 'rangeUpper',
+          value: 0.01
+        },
+        {
+          id: 'probabilityPriceInRange',
+          value: 0.1
+        },
+        {
+          id: 'liquidityCoverageExpectedValue',
+          value: 0
+        },
+        {
+          id: 'estimatedAPY',
+          value: 0
+        },
+      ]
+    }
+  }, useFilters, useSortBy);
 
   const {
     getTableProps,
