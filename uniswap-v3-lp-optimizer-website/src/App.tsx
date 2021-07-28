@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Column, useTable, useSortBy, useFilters, FilterProps } from 'react-table'
 import './App.css';
 import { fetchPositionCandidates } from './position-candidate-calculation';
-import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
+import { PositionCandidate, OptimalPositionConfigurationValues } from 'uniswap-v3-lp-optimizer-types';
 
 function formatAsPercent(number: number, decimalPlaces: number): string {
   return `${(number * 100).toFixed(decimalPlaces)}%`;
@@ -24,9 +24,12 @@ function DefaultColumnFilter({
 
 function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
+  const [configurationValues, setConfigurationValues] = useState<OptimalPositionConfigurationValues>({
+    liquidityAmountProvided: 10000
+  });
   useEffect(() => {
     async function asyncPositionCandidateWrapper() {
-      const positionCandidates = await fetchPositionCandidates();
+      const positionCandidates = await fetchPositionCandidates(configurationValues);
       setPositionCandidates(positionCandidates);
     };
     asyncPositionCandidateWrapper();
@@ -114,7 +117,18 @@ function App() {
             <li>Bin size: 0.25 standard deviation</li>
             <li>Require that potential position overlaps with current price</li>
             <li>Minimum probability of price being in range: 10%</li>
-            <li>Liquidity amount provided: $1000 USD</li>
+            <li>Liquidity $ amount provided:
+              <input
+                size={8}
+                type="text"
+                value={configurationValues.liquidityAmountProvided}
+                onChange={(e) => setConfigurationValues({ liquidityAmountProvided: parseInt(e.target.value) })}
+                onBlur={async function (e) {
+                  setPositionCandidates([]);
+                  const positionCandidates = await fetchPositionCandidates(configurationValues);
+                  setPositionCandidates(positionCandidates);
+                }} />
+            </li>
             <li>Pool last 7 days volume requirement: $3.5M</li>
             <li>Pool last 1 day volume requirement: $0.5M</li>
           </ul>
@@ -122,8 +136,10 @@ function App() {
         <div className="intro-liquidity-visualization-image">
           <img src="liquidityVisualization.svg" alt="liquidity coverage calculation diagram" />
         </div>
-
       </div>
+      <h3 className="table-text-header">
+        Highest APY position per pool
+      </h3>
       {
         data.length === 0 ? <div className="table-loading-container">
           <div className="table-loading-text">Calculating optimal positions... (this can take a little bit)</div>

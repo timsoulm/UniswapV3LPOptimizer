@@ -24,4 +24,7 @@ declare module 'uniswap-v3-lp-optimizer-types' {
             feePercent: number
         }
     };
+    export type OptimalPositionConfigurationValues = {
+        liquidityAmountProvided: number
+    }
 }
