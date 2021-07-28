@@ -8,6 +8,10 @@ function formatAsPercent(number: number, decimalPlaces: number): string {
   return `${(number * 100).toFixed(decimalPlaces)}%`;
 }
 
+function valueWithPercentDifferenceFromTarget(number: number, comparisonNumber: number): string {
+  return `${number.toFixed(6)} (${number - comparisonNumber <= 0 ? '' : '+'}${formatAsPercent((number - comparisonNumber) / comparisonNumber, 2)})`;
+}
+
 function DefaultColumnFilter({
   column: { filterValue, setFilter },
 }: FilterProps<PositionCandidate>) {
@@ -59,13 +63,13 @@ function App() {
       {
         Header: 'Range Lower',
         accessor: 'rangeLower',
-        Cell: props => props.value.toFixed(6),
+        Cell: props => valueWithPercentDifferenceFromTarget(props.value, props.row.values.currentPrice),
         sortType: 'basic'
       },
       {
         Header: 'Range Upper',
         accessor: 'rangeUpper',
-        Cell: props => props.value.toFixed(6),
+        Cell: props => valueWithPercentDifferenceFromTarget(props.value, props.row.values.currentPrice),
         sortType: 'basic'
       },
       {
@@ -81,7 +85,7 @@ function App() {
         sortType: 'basic'
       },
       {
-        Header: 'APY Expected Value',
+        Header: 'APY Expected Value *** (See Disclaimer)',
         accessor: 'estimatedAPY',
         Cell: props => formatAsPercent(props.value, 2),
         sortType: 'basic'
@@ -106,7 +110,7 @@ function App() {
       <h4>Built using data from <a href="https://flipsidecrypto.com">Flipside Crypto</a>. [ <a href="https://app.flipsidecrypto.com/velocity/queries/11495506-6d15-4537-a808-27a1a3b3f946">Query 1</a>, <a href="https://app.flipsidecrypto.com/velocity/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9">Query 2</a> ]</h4>
       <div className="intro-container">
         <div className="intro-disclaimer">
-          <p>This tool is not investment advice, please use it at your own risk. It uses a point-in-time estimate of how much you could potentially earn in fees for providing liquidity in Uniswap V3 (similar to the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>). <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directionally decisions about investments, but past information makes no gaurantees about the future.</p>
+          <p><strong>Disclaimer***: </strong>This tool is not investment advice, please use it at your own risk. It uses a point-in-time estimate of how much you could potentially earn in fees for providing liquidity in Uniswap V3 (similar to the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>). <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directional decisions about investments, but past information makes no gaurantees about the future.</p>
           <p>For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
           <p>Current presets (will make these configurable soon):</p>
           <ul>
