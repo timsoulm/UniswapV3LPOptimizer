@@ -15,7 +15,6 @@ const TOTAL_NUMBER_OF_BINS = PRICE_RANGE_NUM_OF_STD_DEVS * (1 / BIN_WIDTH_PCT_OF
 const BINS_ABOVE_OR_BELOW_CENTER = (TOTAL_NUMBER_OF_BINS - 1) / 2;
 
 const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
-const MINIMUM_PROBABILITY_IN_RANGE = 0.1;
 
 const LIQUIDITY_AMT_USD = 1000;
 
@@ -179,17 +178,16 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
         }
     }
 
-    const topRangePerPool = [];
+    const positionCandidates = [];
     for (const pool in poolLiquiditySummary) {
         const currentPool = poolLiquiditySummary[pool];
-        topRangePerPool.push({
+        const candidatesFromPool = currentPool.rangeLiquidity.map(l => ({
             poolName: pool,
             currentPrice: currentPool.currentPrice,
-            ...currentPool.rangeLiquidity
-                .filter(a => a.probabilityPriceInRange >= MINIMUM_PROBABILITY_IN_RANGE)
-                .sort((a, b) => b.estimatedAPY - a.estimatedAPY)[0]
-        });
+            ...l
+        }));
+        positionCandidates.push(...candidatesFromPool);
     }
 
-    return topRangePerPool;
+    return positionCandidates;
 }

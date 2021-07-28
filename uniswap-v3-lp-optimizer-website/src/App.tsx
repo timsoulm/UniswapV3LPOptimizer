@@ -64,7 +64,8 @@ function CreateSliderColumnFilter(min: number, max: number, step: number, valueF
         <input
           type="text"
           value={valueFormatter(filterValue)}
-          size={6} />
+          size={6}
+          readOnly />
       </>
     );
   }
