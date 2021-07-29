@@ -44,7 +44,9 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
         // Set some pool volume requirements here to get a better idea of pools with
         // some stability
         if (poolSummary.L7_SWAP_USD_AMOUNT_IN < POOL_L7_VOLUME_THRESHOLD
-            || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_VOLUME_THRESHOLD) {
+            || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_VOLUME_THRESHOLD
+            // something wrong with this particular pool calc, investigate later
+            || poolSummary.POOL_NAME === 'INST-WETH 3000 60') {
             return;
         }
         if (!poolLiquiditySummary[poolSummary.POOL_NAME]) {
