@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Column, useTable, useSortBy, useFilters, FilterProps, FilterValue, IdType, Row, usePagination } from 'react-table'
+import { Column, useTable, useSortBy, useFilters, useGlobalFilter, FilterProps, FilterValue, IdType, Row, usePagination } from 'react-table'
 import './App.css';
 import { fetchPositionCandidates } from './position-candidate-calculation';
 import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
@@ -42,6 +42,44 @@ function createFilterRange(isUpper: boolean) {
       return isUpper ? rowValuePercent >= filterValue : rowValuePercent <= filterValue;
     });
   }
+}
+
+function singlePositionPerPoolFilter(
+  rows: Array<Row<PositionCandidate>>,
+  columnIds: Array<IdType<PositionCandidate>>,
+  globalFilterValue: boolean
+): Array<Row<PositionCandidate>> {
+  if (globalFilterValue) {
+    // Reduce list to the top APY position per pool
+    return Object.values(rows.reduce((prev, curr) => {
+      prev[curr.values.poolName] =
+        (prev[curr.values.poolName] && prev[curr.values.poolName].values.estimatedAPY > curr.values.estimatedAPY)
+          ? prev[curr.values.poolName]
+          : curr;
+      return prev;
+    }, {} as { [poolName: string]: Row<PositionCandidate> }));
+  } else {
+    return rows;
+  }
+}
+
+function GlobalFilter({
+  globalFilter,
+  setGlobalFilter,
+}: {
+  globalFilter: boolean,
+  setGlobalFilter: (filterValue: FilterValue) => void
+}) {
+  const [value, setValue] = useState(globalFilter);
+
+  return <div className="table-global-filter-box">
+    <input
+      type="checkbox"
+      checked={value}
+      onChange={e => { setValue(e.target.checked); setGlobalFilter(e.target.checked) }}
+    />
+    Only show top APY position per pool
+  </div>;
 }
 
 function CreateSliderColumnFilter(min: number, max: number, step: number, valueFormatter: (val: number) => string) {
@@ -155,6 +193,7 @@ function App() {
     data,
     defaultColumn,
     initialState: {
+      globalFilter: true,
       filters: [
         {
           id: 'rangeLower',
@@ -178,8 +217,9 @@ function App() {
         },
       ],
       pageSize: 10
-    }
-  }, useFilters, useSortBy, usePagination);
+    },
+    globalFilter: singlePositionPerPoolFilter
+  }, useFilters, useGlobalFilter, useSortBy, usePagination);
 
   const {
     getTableProps,
@@ -187,6 +227,9 @@ function App() {
     headerGroups,
     prepareRow,
     filteredRows,
+    setGlobalFilter,
+    globalFilteredRows,
+    state,
     page,
     pageOptions,
     pageCount,
@@ -206,12 +249,11 @@ function App() {
         <div className="intro-disclaimer">
           <p><strong>Disclaimer***: </strong>This tool is not investment advice, please use it at your own risk. It uses a point-in-time estimate of how much you could potentially earn in fees for providing liquidity in Uniswap V3 (similar to the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>). <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directional decisions about investments, but past information makes no gaurantees about the future.</p>
           <p>For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
-          <p>Current presets (will make these configurable soon):</p>
+          <p>High level calculation presets (will make these configurable soon):</p>
           <ul>
-            <li>10 standard deviations from current price explored (+/- 5)</li>
+            <li>(+/- 5) standard deviations from current price explored</li>
             <li>Bin size: 0.25 standard deviation</li>
             <li>Require that potential position overlaps with current price</li>
-            <li>Minimum probability of price being in range: 10%</li>
             <li>Liquidity amount provided: $1000 USD</li>
             <li>Pool last 7 days volume requirement: $3.5M</li>
             <li>Pool last 1 day volume requirement: $0.5M</li>
@@ -235,7 +277,13 @@ function App() {
           </div>
         </div> :
           <>
-            <h4>Showing <strong>{filteredRows.length}</strong> potential pool {filteredRows.length === 1 ? 'position' : 'positions'}</h4>
+            <div className="table-top-settings">
+              <h4>Showing <strong>{globalFilteredRows.length}</strong> potential pool {globalFilteredRows.length === 1 ? 'position' : 'positions'}</h4>
+              <GlobalFilter
+                globalFilter={state.globalFilter}
+                setGlobalFilter={setGlobalFilter}
+              />
+            </div>
             <table {...getTableProps()} className="rwd-table">
               <thead>
                 {headerGroups.map(headerGroup => (

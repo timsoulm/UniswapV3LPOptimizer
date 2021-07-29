@@ -104,6 +104,17 @@ h4 {
   height: 6em;
 }
 
+.table-top-settings {
+  display: flex;
+  justify-content: center;
+}
+
+.table-global-filter-box {
+  padding-left: 40px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
 .intro-container {
   display: flex;
 }
