@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Column, useTable, useSortBy, useFilters, useGlobalFilter, FilterProps, FilterValue, IdType, Row, usePagination } from 'react-table'
+import { Column, useTable, useSortBy, useFilters, useGlobalFilter, FilterProps, FilterValue, IdType, Row, usePagination, CellProps } from 'react-table'
 import './App.css';
-import { fetchPositionCandidates } from './position-candidate-calculation';
-import { PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
+import { processPoolData } from './position-candidate-calculation';
+import { PositionCandidate, PoolLiquidityDistributions, LiquidityDistributionBar } from 'uniswap-v3-lp-optimizer-types';
 
 function formatAsPercent(number: number, decimalPlaces: number): string {
   return `${(number * 100).toFixed(decimalPlaces)}%`;
@@ -63,6 +63,37 @@ function singlePositionPerPoolFilter(
   }
 }
 
+function liquidityVisualization(
+  currentPrice: number,
+  rangeLower: number,
+  rangeUpper: number,
+  liquidityDistribution: LiquidityDistributionBar[] | null) {
+  if (!liquidityDistribution) {
+    return null;
+  }
+
+  const largestHeight = liquidityDistribution.slice().sort((a, b) => b.liquidity - a.liquidity)[0].liquidity;
+  return <div className="liquidity-chart-container">
+    {liquidityDistribution.map((l, i) => {
+      let barBackgroundColor = '#CCDAF5';
+      if (l.binPrice === currentPrice) {
+        barBackgroundColor = '#606060';
+      } else if (l.binPrice >= rangeLower && l.binPrice <= rangeUpper) {
+        barBackgroundColor = '#7994F7';
+      }
+
+      return <div
+        key={i}
+        className="liquidity-chart-bar"
+        style={{
+          height: (l.liquidity / largestHeight) * 100 + '%',
+          backgroundColor: barBackgroundColor
+        }}>
+      </div>;
+    })}
+  </div>;
+}
+
 function GlobalFilter({
   globalFilter,
   setGlobalFilter,
@@ -112,10 +143,14 @@ function CreateSliderColumnFilter(min: number, max: number, step: number, valueF
 
 function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
+  const [poolLiquidityDistributions, setPoolLiquidityDistributions] = useState<PoolLiquidityDistributions | null>(null);
   useEffect(() => {
     async function asyncPositionCandidateWrapper() {
-      const positionCandidates = await fetchPositionCandidates();
-      setPositionCandidates(positionCandidates);
+      const poolData = await processPoolData();
+      if (poolData) {
+        setPositionCandidates(poolData.positionCandidates);
+        setPoolLiquidityDistributions(poolData.poolLiquidityDistributions);
+      }
     };
     asyncPositionCandidateWrapper();
   }, []);
@@ -142,7 +177,7 @@ function App() {
         accessor: 'currentPrice',
         Cell: props => props.value.toFixed(6),
         sortType: 'basic',
-        disableFilters: true
+        disableFilters: true,
       },
       {
         Header: 'Range Lower',
@@ -159,6 +194,18 @@ function App() {
         sortType: 'basic',
         Filter: CreateSliderColumnFilter(0, .05, 0.002, val => `>${(val * 100).toFixed(1)}%`),
         filter: createFilterRange(true),
+      },
+      {
+        Header: 'Liquidity Visualization',
+        disableFilters: true,
+        Cell: function (props: React.PropsWithChildren<CellProps<PositionCandidate, any>>) {
+          return liquidityVisualization(
+            props.row.values.currentPrice,
+            props.row.values.rangeLower,
+            props.row.values.rangeUpper,
+            poolLiquidityDistributions ? poolLiquidityDistributions[props.row.values.poolName] : null
+          );
+        }
       },
       {
         Header: 'Probability Price In Range',
@@ -185,7 +232,7 @@ function App() {
         filter: filterGreaterThan,
       },
     ],
-    []
+    [poolLiquidityDistributions]
   );
 
   const tableInstance = useTable({
@@ -193,6 +240,9 @@ function App() {
     data,
     defaultColumn,
     initialState: {
+      hiddenColumns: [
+        'currentPrice'
+      ],
       globalFilter: true,
       filters: [
         {
@@ -250,7 +300,7 @@ function App() {
           <p>For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
           <p>High level calculation presets (will make these configurable soon):</p>
           <ul>
-            <li>(+/- 5) standard deviations from current price explored</li>
+            <li>(+/- 4) standard deviations from current price explored</li>
             <li>Bin size: 0.25 standard deviation</li>
             <li>Require that potential position overlaps with current price</li>
             <li>Liquidity amount provided: $1000 USD</li>

@@ -195,3 +195,14 @@ h4 {
     transform: scale(1.0); 
   } 
 }
+
+.liquidity-chart-container {
+  display: flex;
+  align-items: flex-end;
+  height: 2em;
+}
+
+.liquidity-chart-bar {
+  width: 2px;
+  border: 1px solid black;
+}

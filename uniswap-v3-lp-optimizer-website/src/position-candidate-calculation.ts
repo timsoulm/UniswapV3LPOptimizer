@@ -1,10 +1,11 @@
-import { PoolLiquiditySummary, PoolRange, PositionCandidate } from 'uniswap-v3-lp-optimizer-types';
+import { PoolLiquiditySummary, PoolRange, PoolProcessingResult, PoolLiquidityDistributions } from 'uniswap-v3-lp-optimizer-types';
 import NormalDistribution from 'normal-distribution';
+import { logDOM } from '@testing-library/react';
 
 const poolLiquiditySummary: PoolLiquiditySummary = {};
 
-// The number of standard deviations to analyze surrounding the target price (+/- 10)
-const PRICE_RANGE_NUM_OF_STD_DEVS = 10;
+// The number of standard deviations to analyze surrounding the target price (+/- 8)
+const PRICE_RANGE_NUM_OF_STD_DEVS = 8;
 
 // The proportion of a standard deviation that a single bin represents
 const BIN_WIDTH_PCT_OF_STD_DEV = .25;
@@ -25,7 +26,7 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
 }
 
-export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
+export async function processPoolData(): Promise<PoolProcessingResult | null> {
     const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
         fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest'),
         fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
@@ -37,7 +38,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
     ]);
 
     if (!Array.isArray(poolSummaries) || !Array.isArray(poolPositions)) {
-        return [];
+        return null;
     }
 
     poolSummaries.forEach(poolSummary => {
@@ -87,11 +88,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
         const upperBinIndexInRange = Math.min(upperBinIndex, (TOTAL_NUMBER_OF_BINS - 1));
 
         for (let i = lowerBinIndexInRange; i <= upperBinIndexInRange; i++) {
-            if (!poolLiquiditySummaryForPosition.binLiquidity[i]) {
-                poolLiquiditySummaryForPosition.binLiquidity[i] = position.LIQUIDITY_ADJ;
-            } else {
-                poolLiquiditySummaryForPosition.binLiquidity[i] += position.LIQUIDITY_ADJ;
-            }
+            poolLiquiditySummaryForPosition.binLiquidity[i] += position.LIQUIDITY_ADJ;
         }
     });
 
@@ -181,6 +178,7 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
     }
 
     const positionCandidates = [];
+    const poolLiquidityDistributions = {} as PoolLiquidityDistributions;
     for (const pool in poolLiquiditySummary) {
         const currentPool = poolLiquiditySummary[pool];
         const candidatesFromPool = currentPool.rangeLiquidity.map(l => ({
@@ -189,7 +187,14 @@ export async function fetchPositionCandidates(): Promise<PositionCandidate[]> {
             ...l
         }));
         positionCandidates.push(...candidatesFromPool);
+        poolLiquidityDistributions[pool] = currentPool.binLiquidity.map((l, i) => ({
+            liquidity: l,
+            binPrice: convertBinIndexToPrice(i, currentPool.binWidth, currentPool.currentPrice)
+        }));
     }
 
-    return positionCandidates;
+    return {
+        positionCandidates,
+        poolLiquidityDistributions
+    }
 }

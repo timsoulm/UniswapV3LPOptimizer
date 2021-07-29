@@ -10,6 +10,13 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         poolName: string,
         currentPrice: number
     }
+    export type LiquidityDistributionBar = {
+        liquidity: number,
+        binPrice: number
+    }
+    export type PoolLiquidityDistributions = {
+        [poolName: string]: LiquidityDistributionBar[]
+    }
     export type PoolLiquiditySummary = {
         [poolName: string]: {
             priceMean: number,
@@ -23,5 +30,9 @@ declare module 'uniswap-v3-lp-optimizer-types' {
             dailyVolume: number,
             feePercent: number
         }
+    };
+    export type PoolProcessingResult = {
+        positionCandidates: PositionCandidate[],
+        poolLiquidityDistributions: PoolLiquidityDistributions
     };
 }
