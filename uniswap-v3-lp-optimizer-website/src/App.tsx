@@ -226,7 +226,6 @@ function App() {
     getTableBodyProps,
     headerGroups,
     prepareRow,
-    filteredRows,
     setGlobalFilter,
     globalFilteredRows,
     state,
@@ -266,7 +265,7 @@ function App() {
       </div>
       {
         data.length === 0 ? <div className="table-loading-container">
-          <div className="table-loading-text">Calculating optimal positions... (this can take a little bit)</div>
+          <div className="table-loading-text">Calculating positions... (this can take a little bit)</div>
           <div className="sk-chase">
             <div className="sk-chase-dot"></div>
             <div className="sk-chase-dot"></div>
