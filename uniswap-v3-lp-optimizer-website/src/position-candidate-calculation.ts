@@ -1,6 +1,5 @@
 import { PoolLiquiditySummary, PoolRange, PoolProcessingResult, PoolLiquidityDistributions } from 'uniswap-v3-lp-optimizer-types';
 import NormalDistribution from 'normal-distribution';
-import { logDOM } from '@testing-library/react';
 
 const poolLiquiditySummary: PoolLiquiditySummary = {};
 
