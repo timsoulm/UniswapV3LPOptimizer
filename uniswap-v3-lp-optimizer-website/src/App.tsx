@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Column, useTable, useSortBy, useFilters, useGlobalFilter, FilterProps, FilterValue, IdType, Row, usePagination, CellProps } from 'react-table'
 import './App.css';
 import { processPoolData } from './position-candidate-calculation';
-import { PositionCandidate, PoolLiquidityDistributions, LiquidityDistributionBar } from 'uniswap-v3-lp-optimizer-types';
+import { PositionCandidate, PoolLiquidityDistributions, LiquidityDistributionBar, CalculationConfigurationValues } from 'uniswap-v3-lp-optimizer-types';
 
 function formatAsPercent(number: number, decimalPlaces: number): string {
   return `${(number * 100).toFixed(decimalPlaces)}%`;
@@ -144,9 +144,12 @@ function CreateSliderColumnFilter(min: number, max: number, step: number, valueF
 function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
   const [poolLiquidityDistributions, setPoolLiquidityDistributions] = useState<PoolLiquidityDistributions | null>(null);
+  const [configurationValues, setConfigurationValues] = useState<CalculationConfigurationValues>({
+    liquidityAmountProvided: 1000
+  });
   useEffect(() => {
     async function asyncPositionCandidateWrapper() {
-      const poolData = await processPoolData();
+      const poolData = await processPoolData(configurationValues);
       if (poolData) {
         setPositionCandidates(poolData.positionCandidates);
         setPoolLiquidityDistributions(poolData.poolLiquidityDistributions);
@@ -296,14 +299,28 @@ function App() {
       <h4>Built using data from <a href="https://flipsidecrypto.com">Flipside Crypto</a>. [ <a href="https://app.flipsidecrypto.com/velocity/queries/11495506-6d15-4537-a808-27a1a3b3f946">Query 1</a>, <a href="https://app.flipsidecrypto.com/velocity/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9">Query 2</a> ]</h4>
       <div className="intro-container">
         <div className="intro-disclaimer">
-          <p><strong>Disclaimer***: </strong>This tool is not investment advice, please use it at your own risk. It uses a point-in-time estimate of how much you could potentially earn in fees for providing liquidity in Uniswap V3 (similar to the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>). <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directional decisions about investments, but past information makes no gaurantees about the future.</p>
+          <p><strong>Disclaimer***: </strong>This tool is not investment advice, please use it at your own risk. It uses an expected value calculation to estimate the fee earning potential for a day (then extrapolated to APY). This is similar to the methodology of the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>. <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directional decisions about investments, but past information makes no gaurantees about the future.</p>
           <p>For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
-          <p>High level calculation presets (will make these configurable soon):</p>
+          <p>High level calculation presets (changing these will re-run calculation):</p>
           <ul>
             <li>(+/- 4) standard deviations from current price explored</li>
             <li>Bin size: 0.25 standard deviation</li>
             <li>Require that potential position overlaps with current price</li>
-            <li>Liquidity amount provided: $1000 USD</li>
+            <li>Liquidity $ amount provided:
+              <input
+                style={{ marginLeft: '8px' }}
+                size={8}
+                type="text"
+                value={configurationValues.liquidityAmountProvided}
+                onChange={(e) => setConfigurationValues({ liquidityAmountProvided: parseInt(e.target.value) })}
+                onBlur={async function (e) {
+                  setPositionCandidates([]);
+                  const poolData = await processPoolData(configurationValues);
+                  if (poolData) {
+                    setPositionCandidates(poolData.positionCandidates);
+                  }
+                }} />
+            </li>
             <li>Pool last 7 days volume requirement: $3.5M</li>
             <li>Pool last 1 day volume requirement: $0.5M</li>
           </ul>

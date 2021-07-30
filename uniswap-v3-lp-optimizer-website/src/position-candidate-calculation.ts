@@ -1,7 +1,5 @@
-import { PoolLiquiditySummary, PoolRange, PoolProcessingResult, PoolLiquidityDistributions } from 'uniswap-v3-lp-optimizer-types';
+import { PoolLiquiditySummary, PoolRange, PoolProcessingResult, PoolLiquidityDistributions, CalculationConfigurationValues } from 'uniswap-v3-lp-optimizer-types';
 import NormalDistribution from 'normal-distribution';
-
-const poolLiquiditySummary: PoolLiquiditySummary = {};
 
 // The number of standard deviations to analyze surrounding the target price (+/- 8)
 const PRICE_RANGE_NUM_OF_STD_DEVS = 8;
@@ -16,8 +14,6 @@ const BINS_ABOVE_OR_BELOW_CENTER = (TOTAL_NUMBER_OF_BINS - 1) / 2;
 
 const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
-const LIQUIDITY_AMT_USD = 1000;
-
 const POOL_L7_VOLUME_THRESHOLD = 3_500_000;
 const POOL_L1_VOLUME_THRESHOLD = 500_000;
 
@@ -25,7 +21,8 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
 }
 
-export async function processPoolData(): Promise<PoolProcessingResult | null> {
+export async function processPoolData(configurationValues: CalculationConfigurationValues): Promise<PoolProcessingResult | null> {
+    const poolLiquiditySummary: PoolLiquiditySummary = {};
     const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
         fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest'),
         fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
@@ -122,13 +119,13 @@ export async function processPoolData(): Promise<PoolProcessingResult | null> {
                 //        ((total_lp_amt - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
                 //
                 //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
-                const amt0 = (LIQUIDITY_AMT_USD * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
+                const amt0 = (configurationValues.liquidityAmountProvided * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
                     (-Math.sqrt(rangeUpper) * Math.sqrt(currentPrice) * token1_USD * Math.sqrt(rangeLower) +
                         Math.sqrt(rangeUpper) * currentPrice * token1_USD +
                         Math.sqrt(rangeUpper) * token0_USD -
                         Math.sqrt(currentPrice) * token0_USD
                     );
-                const amt1 = (LIQUIDITY_AMT_USD - amt0 * token0_USD) / token1_USD;
+                const amt1 = (configurationValues.liquidityAmountProvided - amt0 * token0_USD) / token1_USD;
 
                 // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
                 const positionLiquidity = Math.min(
@@ -168,7 +165,7 @@ export async function processPoolData(): Promise<PoolProcessingResult | null> {
                         (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
                             + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
                     liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
-                    estimatedAPY: (estimatedDailyFees / LIQUIDITY_AMT_USD) * 365
+                    estimatedAPY: (estimatedDailyFees / configurationValues.liquidityAmountProvided) * 365
                 };
 
                 currentPool.rangeLiquidity.push(rangeLiquidity);

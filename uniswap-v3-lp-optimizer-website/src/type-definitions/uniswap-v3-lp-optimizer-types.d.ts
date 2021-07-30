@@ -35,4 +35,7 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         positionCandidates: PositionCandidate[],
         poolLiquidityDistributions: PoolLiquidityDistributions
     };
+    export type CalculationConfigurationValues = {
+        liquidityAmountProvided: number
+    }
 }
