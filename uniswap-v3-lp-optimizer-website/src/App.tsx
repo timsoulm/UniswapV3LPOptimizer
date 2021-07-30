@@ -147,7 +147,13 @@ function App() {
   const [configurationValues, setConfigurationValues] = useState<CalculationConfigurationValues>({
     liquidityAmountProvided: 1000
   });
+  const [shouldCalculatePositions, setShouldCalculatePositions] = useState<boolean>(true);
   useEffect(() => {
+    if (!shouldCalculatePositions) {
+      return;
+    }
+    setPositionCandidates([]);
+
     async function asyncPositionCandidateWrapper() {
       const poolData = await processPoolData(configurationValues);
       if (poolData) {
@@ -156,7 +162,9 @@ function App() {
       }
     };
     asyncPositionCandidateWrapper();
-  }, []);
+
+    setShouldCalculatePositions(false);
+  }, [shouldCalculatePositions, configurationValues]);
 
   const data: Array<PositionCandidate> = useMemo(
     () => positionCandidates, [positionCandidates]
@@ -314,11 +322,7 @@ function App() {
                 value={configurationValues.liquidityAmountProvided}
                 onChange={(e) => setConfigurationValues({ liquidityAmountProvided: parseInt(e.target.value) })}
                 onBlur={async function (e) {
-                  setPositionCandidates([]);
-                  const poolData = await processPoolData(configurationValues);
-                  if (poolData) {
-                    setPositionCandidates(poolData.positionCandidates);
-                  }
+                  setShouldCalculatePositions(true);
                 }} />
             </li>
             <li>Pool last 7 days volume requirement: $3.5M</li>
