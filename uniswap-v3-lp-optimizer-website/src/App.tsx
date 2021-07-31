@@ -376,7 +376,7 @@ function App() {
                 </ul>
               </form>
             </li>
-            <li>Pool avg daily volume requirement: $500k</li>
+            <li>Pool avg daily volume threshold: $1M</li>
           </ul>
         </div>
         <div className="intro-liquidity-visualization-image">

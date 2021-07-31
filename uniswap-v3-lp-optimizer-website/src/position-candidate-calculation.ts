@@ -14,7 +14,7 @@ const BINS_ABOVE_OR_BELOW_CENTER = (TOTAL_NUMBER_OF_BINS - 1) / 2;
 
 const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
-const POOL_AVG_DAILY_VOLUME_THRESHOLD = 500_000;
+const POOL_AVG_DAILY_VOLUME_THRESHOLD = 1_000_000;
 
 function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: number) {
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
@@ -170,6 +170,11 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                     currentPool.dailyVolume *
                     currentPool.feePercent * .01;
 
+                let estimatedAPY = (estimatedDailyFees / configurationValues.liquidityAmountProvided) * 365;
+                if (volumeMethodology === 'AVG_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_HOURLY_VOLUME') {
+                    estimatedAPY *= 24;
+                }
+
                 const rangeLiquidity: PoolRange = {
                     rangeLower: rangeLower,
                     rangeUpper: rangeUpper,
@@ -177,7 +182,7 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                         (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
                             + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
                     liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
-                    estimatedAPY: (estimatedDailyFees / configurationValues.liquidityAmountProvided) * 365
+                    estimatedAPY: estimatedAPY
                 };
 
                 currentPool.rangeLiquidity.push(rangeLiquidity);
