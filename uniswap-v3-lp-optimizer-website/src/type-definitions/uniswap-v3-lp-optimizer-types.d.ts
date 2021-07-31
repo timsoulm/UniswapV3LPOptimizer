@@ -36,6 +36,10 @@ declare module 'uniswap-v3-lp-optimizer-types' {
         poolLiquidityDistributions: PoolLiquidityDistributions
     };
     export type CalculationConfigurationValues = {
-        liquidityAmountProvided: number
+        liquidityAmountProvided: number,
+        volumeMethodology: {
+            timePeriod: 'hourly' | 'daily'
+            aggregation: 'mean' | 'median'
+        }
     }
 }

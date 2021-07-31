@@ -125,6 +125,7 @@ h4 {
 
 .intro-liquidity-visualization-image {
   width: 65%;
+  display: flex;
 }
 
 .slider-filter {

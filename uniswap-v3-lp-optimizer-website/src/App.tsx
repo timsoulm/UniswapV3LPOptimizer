@@ -145,7 +145,11 @@ function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
   const [poolLiquidityDistributions, setPoolLiquidityDistributions] = useState<PoolLiquidityDistributions | null>(null);
   const [configurationValues, setConfigurationValues] = useState<CalculationConfigurationValues>({
-    liquidityAmountProvided: 1000
+    liquidityAmountProvided: 1000,
+    volumeMethodology: {
+      timePeriod: 'daily',
+      aggregation: 'mean'
+    }
   });
   const [shouldCalculatePositions, setShouldCalculatePositions] = useState<boolean>(true);
   useEffect(() => {
@@ -165,6 +169,22 @@ function App() {
 
     setShouldCalculatePositions(false);
   }, [shouldCalculatePositions, configurationValues]);
+
+  function handleVolumeMethodologyChangeEvent(isTimePeriod: boolean) {
+    return function (e: React.ChangeEvent<HTMLInputElement>) {
+      const volumeMethodology = { ...configurationValues.volumeMethodology };
+      if (isTimePeriod) {
+        volumeMethodology.timePeriod = e.target.value as 'daily' | 'hourly';
+      } else {
+        volumeMethodology.aggregation = e.target.value as 'mean' | 'median';
+      }
+      setConfigurationValues({
+        ...configurationValues,
+        volumeMethodology: volumeMethodology
+      });
+      setShouldCalculatePositions(true);
+    }
+  }
 
   const data: Array<PositionCandidate> = useMemo(
     () => positionCandidates, [positionCandidates]
@@ -311,8 +331,7 @@ function App() {
           <p>For more information about the calculation methodology, see the <a href="https://github.com/timsoulm/UniswapV3LPOptimizer">Github README and code</a></p>
           <p>High level calculation presets (changing these will re-run calculation):</p>
           <ul>
-            <li>(+/- 4) standard deviations from current price explored</li>
-            <li>Bin size: 0.25 standard deviation</li>
+            <li>Evaluate +/- 4 standard deviations from current price, bin size = 1/4 std dev</li>
             <li>Require that potential position overlaps with current price</li>
             <li>Liquidity $ amount provided:
               <input
@@ -320,13 +339,44 @@ function App() {
                 size={8}
                 type="text"
                 value={configurationValues.liquidityAmountProvided}
-                onChange={(e) => setConfigurationValues({ liquidityAmountProvided: parseInt(e.target.value) })}
+                onChange={(e) => setConfigurationValues({ ...configurationValues, liquidityAmountProvided: parseInt(e.target.value) })}
                 onBlur={async function (e) {
                   setShouldCalculatePositions(true);
                 }} />
             </li>
-            <li>Pool last 7 days volume requirement: $3.5M</li>
-            <li>Pool last 1 day volume requirement: $0.5M</li>
+            <li>Volume methodology:
+              <form>
+                <ul>
+                  <li>
+                    <input
+                      type='radio'
+                      value='daily'
+                      checked={configurationValues.volumeMethodology.timePeriod === 'daily'}
+                      onChange={handleVolumeMethodologyChangeEvent(true)} /> Daily
+                    <input
+                      type='radio'
+                      value='hourly'
+                      checked={configurationValues.volumeMethodology.timePeriod === 'hourly'}
+                      onChange={handleVolumeMethodologyChangeEvent(true)} /> Hourly
+                  </li>
+                  <li>
+                    <input
+                      type='radio'
+                      value='mean'
+                      checked={configurationValues.volumeMethodology.aggregation === 'mean'}
+                      onChange={handleVolumeMethodologyChangeEvent(false)}
+                    /> Mean
+                    <input
+                      type='radio'
+                      value='median'
+                      checked={configurationValues.volumeMethodology.aggregation === 'median'}
+                      onChange={handleVolumeMethodologyChangeEvent(false)}
+                    /> Median
+                  </li>
+                </ul>
+              </form>
+            </li>
+            <li>Pool avg daily volume requirement: $500k</li>
           </ul>
         </div>
         <div className="intro-liquidity-visualization-image">

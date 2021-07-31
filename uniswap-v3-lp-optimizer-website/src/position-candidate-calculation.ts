@@ -14,8 +14,7 @@ const BINS_ABOVE_OR_BELOW_CENTER = (TOTAL_NUMBER_OF_BINS - 1) / 2;
 
 const REQUIRE_RANGE_OVERLAP_WITH_CURRENT_PRICE = true;
 
-const POOL_L7_VOLUME_THRESHOLD = 3_500_000;
-const POOL_L1_VOLUME_THRESHOLD = 500_000;
+const POOL_AVG_DAILY_VOLUME_THRESHOLD = 500_000;
 
 function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: number) {
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
@@ -24,7 +23,7 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
 export async function processPoolData(configurationValues: CalculationConfigurationValues): Promise<PoolProcessingResult | null> {
     const poolLiquiditySummary: PoolLiquiditySummary = {};
     const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
-        fetch('https://api.flipsidecrypto.com/api/v2/queries/11495506-6d15-4537-a808-27a1a3b3f946/data/latest'),
+        fetch('https://api.flipsidecrypto.com/api/v2/queries/efed0457-5edc-46fa-ad7b-cffd01d5b93d/data/latest'),
         fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
     ]);
 
@@ -37,11 +36,24 @@ export async function processPoolData(configurationValues: CalculationConfigurat
         return null;
     }
 
+    let volumeMethodology = 'AVG_DAILY_VOLUME';
+    if (configurationValues.volumeMethodology.timePeriod === 'daily') {
+        if (configurationValues.volumeMethodology.aggregation === 'mean') {
+            volumeMethodology = 'AVG_DAILY_VOLUME';
+        } else {
+            volumeMethodology = 'MEDIAN_DAILY_VOLUME';
+        }
+    } else {
+        if (configurationValues.volumeMethodology.aggregation === 'mean') {
+            volumeMethodology = 'AVG_HOURLY_VOLUME';
+        } else {
+            volumeMethodology = 'MEDIAN_HOURLY_VOLUME';
+        }
+    }
+
     poolSummaries.forEach(poolSummary => {
-        // Set some pool volume requirements here to get a better idea of pools with
-        // some stability
-        if (poolSummary.L7_SWAP_USD_AMOUNT_IN < POOL_L7_VOLUME_THRESHOLD
-            || poolSummary.L1_SWAP_USD_AMOUNT_IN < POOL_L1_VOLUME_THRESHOLD
+        // Set some pool volume requirements here to get better stability
+        if (poolSummary.AVG_DAILY_VOLUME < POOL_AVG_DAILY_VOLUME_THRESHOLD
             // something wrong with this particular pool calc, investigate later
             || poolSummary.POOL_NAME === 'INST-WETH 3000 60') {
             return;
@@ -56,7 +68,7 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                 token1_USD: poolSummary.TOKEN1_USD,
                 token0_USD: poolSummary.TOKEN0_USD,
                 priceStandardDeviation: poolSummary.L7_STDDEV_PRICE_1_0,
-                dailyVolume: poolSummary.L7_SWAP_USD_AMOUNT_IN / 7,
+                dailyVolume: poolSummary[volumeMethodology],
                 feePercent: poolSummary.FEE_PERCENT
             }
         }
