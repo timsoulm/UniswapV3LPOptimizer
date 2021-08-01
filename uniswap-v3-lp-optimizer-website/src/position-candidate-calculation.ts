@@ -20,23 +20,8 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
     return ((index - BINS_ABOVE_OR_BELOW_CENTER) * binWidth) + centerPrice;
 }
 
-export async function processPoolData(configurationValues: CalculationConfigurationValues): Promise<PoolProcessingResult | null> {
-    const poolLiquiditySummary: PoolLiquiditySummary = {};
-    const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
-        fetch('https://api.flipsidecrypto.com/api/v2/queries/efed0457-5edc-46fa-ad7b-cffd01d5b93d/data/latest'),
-        fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
-    ]);
-
-    const [poolSummaries, poolPositions] = await Promise.all([
-        poolSummaryResponse.json(),
-        poolPositionResponse.json()
-    ]);
-
-    if (!Array.isArray(poolSummaries) || !Array.isArray(poolPositions)) {
-        return null;
-    }
-
-    let volumeMethodology = 'AVG_DAILY_VOLUME';
+function getVolumeMethodology(configurationValues: CalculationConfigurationValues): string {
+    let volumeMethodology;
     if (configurationValues.volumeMethodology.timePeriod === 'daily') {
         if (configurationValues.volumeMethodology.aggregation === 'mean') {
             volumeMethodology = 'AVG_DAILY_VOLUME';
@@ -50,14 +35,29 @@ export async function processPoolData(configurationValues: CalculationConfigurat
             volumeMethodology = 'MEDIAN_HOURLY_VOLUME';
         }
     }
+    return volumeMethodology;
+}
 
-    poolSummaries.forEach(poolSummary => {
+function initializePoolLiquiditySummary(
+    configurationValues: CalculationConfigurationValues,
+    poolSummaries: any,
+    poolLiquiditySummary: PoolLiquiditySummary) {
+
+    const volumeMethodology = getVolumeMethodology(configurationValues);
+
+    poolSummaries.forEach((poolSummary: any) => {
         // Set some pool volume requirements here to get better stability
         if (poolSummary.AVG_DAILY_VOLUME < POOL_AVG_DAILY_VOLUME_THRESHOLD
             // something wrong with this particular pool calc, investigate later
             || poolSummary.POOL_NAME === 'INST-WETH 3000 60') {
             return;
         }
+
+        const dailyVolume =
+            volumeMethodology === 'AVG_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_HOURLY_VOLUME'
+                ? poolSummary[volumeMethodology] * 24
+                : poolSummary[volumeMethodology];
+
         if (!poolLiquiditySummary[poolSummary.POOL_NAME]) {
             poolLiquiditySummary[poolSummary.POOL_NAME] = {
                 binWidth: poolSummary.L7_STDDEV_PRICE_1_0 * BIN_WIDTH_PCT_OF_STD_DEV,
@@ -68,13 +68,18 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                 token1_USD: poolSummary.TOKEN1_USD,
                 token0_USD: poolSummary.TOKEN0_USD,
                 priceStandardDeviation: poolSummary.L7_STDDEV_PRICE_1_0,
-                dailyVolume: poolSummary[volumeMethodology],
+                dailyVolume: dailyVolume,
                 feePercent: poolSummary.FEE_PERCENT
             }
         }
     });
+}
 
-    poolPositions.forEach(position => {
+function generateLiquidityDistribution(
+    poolPositions: any,
+    poolLiquiditySummary: PoolLiquiditySummary) {
+
+    poolPositions.forEach((position: any) => {
         if (!(position.POOL_NAME in poolLiquiditySummary)) {
             return;
         }
@@ -99,6 +104,46 @@ export async function processPoolData(configurationValues: CalculationConfigurat
             poolLiquiditySummaryForPosition.binLiquidity[i] += position.LIQUIDITY_ADJ;
         }
     });
+}
+
+function getPositionLiquidity(
+    configurationValues: CalculationConfigurationValues,
+    currentPrice: number,
+    rangeLower: number,
+    rangeUpper: number,
+    token0_USD: number,
+    token1_USD: number) {
+
+    // Solve the following system of equations to get amt0 and amt1
+    // Eq1: amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) = amt1 / (sqrt(cprice) - sqrt(lower))
+    // Eq2: amt0 * token0usd + amt1 * token1usd = total_lp_amt
+    // 
+    // Eq2: amt1 = (total_lp_amt - amt0 * token0usd) / token1usd
+    // Eq1 w/ substitution for amt1:
+    //     amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) =
+    //        ((total_lp_amt - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
+    //
+    //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
+    const amt0 = (configurationValues.liquidityAmountProvided * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
+        (-Math.sqrt(rangeUpper) * Math.sqrt(currentPrice) * token1_USD * Math.sqrt(rangeLower) +
+            Math.sqrt(rangeUpper) * currentPrice * token1_USD +
+            Math.sqrt(rangeUpper) * token0_USD -
+            Math.sqrt(currentPrice) * token0_USD
+        );
+    const amt1 = (configurationValues.liquidityAmountProvided - amt0 * token0_USD) / token1_USD;
+
+    // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
+    const positionLiquidity = Math.min(
+        amt0 * (Math.sqrt(rangeUpper) * Math.sqrt(currentPrice)) / (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice)),
+        amt1 / (Math.sqrt(currentPrice) - Math.sqrt(rangeLower))
+    );
+
+    return positionLiquidity;
+}
+
+function calculatePositions(
+    configurationValues: CalculationConfigurationValues,
+    poolLiquiditySummary: PoolLiquiditySummary) {
 
     for (const pool in poolLiquiditySummary) {
         const currentPool = poolLiquiditySummary[pool];
@@ -121,29 +166,15 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                     continue;
                 }
 
-                // Solve the following system of equations to get amt0 and amt1
-                // Eq1: amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) = amt1 / (sqrt(cprice) - sqrt(lower))
-                // Eq2: amt0 * token0usd + amt1 * token1usd = total_lp_amt
-                // 
-                // Eq2: amt1 = (total_lp_amt - amt0 * token0usd) / token1usd
-                // Eq1 w/ substitution for amt1:
-                //     amt0 * (sqrt(upper) * sqrt(cprice)) / (sqrt(upper) - sqrt(cprice)) =
-                //        ((total_lp_amt - amt0 * token0usd) / token1usd) / (sqrt(cprice) - sqrt(lower))
-                //
-                //    Solution from wolfram alpha: https://bit.ly/2V59Wyh
-                const amt0 = (configurationValues.liquidityAmountProvided * (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice))) /
-                    (-Math.sqrt(rangeUpper) * Math.sqrt(currentPrice) * token1_USD * Math.sqrt(rangeLower) +
-                        Math.sqrt(rangeUpper) * currentPrice * token1_USD +
-                        Math.sqrt(rangeUpper) * token0_USD -
-                        Math.sqrt(currentPrice) * token0_USD
+                const positionLiquidity =
+                    getPositionLiquidity(
+                        configurationValues,
+                        currentPrice,
+                        rangeLower,
+                        rangeUpper,
+                        token0_USD,
+                        token1_USD
                     );
-                const amt1 = (configurationValues.liquidityAmountProvided - amt0 * token0_USD) / token1_USD;
-
-                // Evaluate Case 2: lower < cprice <= upper from https://uniswapv3.flipsidecrypto.com/
-                const positionLiquidity = Math.min(
-                    amt0 * (Math.sqrt(rangeUpper) * Math.sqrt(currentPrice)) / (Math.sqrt(rangeUpper) - Math.sqrt(currentPrice)),
-                    amt1 / (Math.sqrt(currentPrice) - Math.sqrt(rangeLower))
-                );
 
                 // TODO: fix bug where calculation sometimes comes out to NaN
                 // Maybe due to floating point precision in JS? Need to switch to Big.js anyway
@@ -170,11 +201,6 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                     currentPool.dailyVolume *
                     currentPool.feePercent * .01;
 
-                let estimatedAPY = (estimatedDailyFees / configurationValues.liquidityAmountProvided) * 365;
-                if (volumeMethodology === 'AVG_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_HOURLY_VOLUME') {
-                    estimatedAPY *= 24;
-                }
-
                 const rangeLiquidity: PoolRange = {
                     rangeLower: rangeLower,
                     rangeUpper: rangeUpper,
@@ -182,14 +208,16 @@ export async function processPoolData(configurationValues: CalculationConfigurat
                         (normalDistFromCurrentPrice.probabilityBetween(rangeLower, rangeUpper)
                             + normalDistFromMeanPrice.probabilityBetween(rangeLower, rangeUpper)) / 2,
                     liquidityCoverageExpectedValue: liquidityCoverageExpectedValue,
-                    estimatedAPY: estimatedAPY
+                    estimatedAPY: (estimatedDailyFees / configurationValues.liquidityAmountProvided) * 365
                 };
 
                 currentPool.rangeLiquidity.push(rangeLiquidity);
             }
         }
     }
+}
 
+function processPositionCandidates(poolLiquiditySummary: PoolLiquiditySummary) {
     const positionCandidates = [];
     const poolLiquidityDistributions = {} as PoolLiquidityDistributions;
     for (const pool in poolLiquiditySummary) {
@@ -210,4 +238,29 @@ export async function processPoolData(configurationValues: CalculationConfigurat
         positionCandidates,
         poolLiquidityDistributions
     }
+}
+
+export async function processPoolData(configurationValues: CalculationConfigurationValues): Promise<PoolProcessingResult | null> {
+    const poolLiquiditySummary: PoolLiquiditySummary = {};
+    const [poolSummaryResponse, poolPositionResponse] = await Promise.all([
+        fetch('https://api.flipsidecrypto.com/api/v2/queries/efed0457-5edc-46fa-ad7b-cffd01d5b93d/data/latest'),
+        fetch('https://api.flipsidecrypto.com/api/v2/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9/data/latest')
+    ]);
+
+    const [poolSummaries, poolPositions] = await Promise.all([
+        poolSummaryResponse.json(),
+        poolPositionResponse.json()
+    ]);
+
+    if (!Array.isArray(poolSummaries) || !Array.isArray(poolPositions)) {
+        return null;
+    }
+
+    initializePoolLiquiditySummary(configurationValues, poolSummaries, poolLiquiditySummary);
+
+    generateLiquidityDistribution(poolPositions, poolLiquiditySummary);
+
+    calculatePositions(configurationValues, poolLiquiditySummary);
+
+    return processPositionCandidates(poolLiquiditySummary);
 }
