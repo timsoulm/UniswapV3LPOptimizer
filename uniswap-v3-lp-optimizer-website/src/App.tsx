@@ -324,7 +324,7 @@ function App() {
   return (
     <div>
       <h1>Uniswap V3 Optimal Pool Position Estimation Tool</h1>
-      <h4>Built using data from <a href="https://flipsidecrypto.com">Flipside Crypto</a>. [ <a href="https://app.flipsidecrypto.com/velocity/queries/11495506-6d15-4537-a808-27a1a3b3f946">Query 1</a>, <a href="https://app.flipsidecrypto.com/velocity/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9">Query 2</a> ]</h4>
+      <h4>Built using data from <a href="https://flipsidecrypto.com">Flipside Crypto</a>. [ <a href="https://app.flipsidecrypto.com/velocity/queries/efed0457-5edc-46fa-ad7b-cffd01d5b93d">Query 1</a>, <a href="https://app.flipsidecrypto.com/velocity/queries/bb47119b-a9ad-4c59-ac4d-be8c880786e9">Query 2</a> ]</h4>
       <div className="intro-container">
         <div className="intro-disclaimer">
           <p><strong>Disclaimer***: </strong>This tool is not investment advice, please use it at your own risk. It uses an expected value calculation to estimate the fee earning potential for a day (then extrapolated to APY). This is similar to the methodology of the <a href="https://uniswapv3.flipsidecrypto.com/">Flipside Uniswap Fees Calculator</a>. <strong>It assumes no changes to swap price, swap volumes or liquidity positions which is not realistic. It also does not account for Impermanent Loss currently. </strong>Use it to make directional decisions about investments, but past information makes no gaurantees about the future.</p>
@@ -344,7 +344,7 @@ function App() {
                   setShouldCalculatePositions(true);
                 }} />
             </li>
-            <li>Volume methodology:
+            <li>Volume estimation methodology:
               <form>
                 <ul>
                   <li>
@@ -376,13 +376,21 @@ function App() {
                 </ul>
               </form>
             </li>
-            <li>Pool avg daily volume threshold: $1M</li>
+            <li>Pool avg daily volume min threshold: $1M</li>
           </ul>
         </div>
-        <div className="intro-liquidity-visualization-image">
-          <img src="liquidityVisualization.svg" alt="liquidity coverage calculation diagram" />
+        <div className="intro-righthand-side">
+          <div className="intro-liquidity-visualization-image">
+            <img src="liquidityVisualization.svg" alt="liquidity coverage calculation diagram" />
+          </div>
+          <div className="intro-donation-section">
+            <p>
+              Finding this site useful?
+            </p>
+            <p><strong>BTC Donations:</strong> 39R2n93kXVKba2Uv9i4JbsPDDjYoz2jgGq</p>
+            <p><strong>ETH Donations:</strong> 0xcE109E4879D1B2765c8439b7FBaA2E7640fBE832</p>
+          </div>
         </div>
-
       </div>
       {
         data.length === 0 ? <div className="table-loading-container">

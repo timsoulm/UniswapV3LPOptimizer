@@ -123,9 +123,20 @@ h4 {
   width: 35%;
 }
 
-.intro-liquidity-visualization-image {
+.intro-righthand-side {
   width: 65%;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.intro-liquidity-visualization-image {
+  width: 100%;
+}
+
+.intro-donation-section {
+  font-size: 12px;
+  text-align: center;
 }
 
 .slider-filter {
