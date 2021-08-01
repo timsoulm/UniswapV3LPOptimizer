@@ -1,7 +1,7 @@
 import { PoolLiquiditySummary, PoolRange, PoolProcessingResult, PoolLiquidityDistributions, CalculationConfigurationValues } from 'uniswap-v3-lp-optimizer-types';
 import NormalDistribution from 'normal-distribution';
 
-// The number of standard deviations to analyze surrounding the target price (+/- 8)
+// The number of standard deviations to analyze surrounding the target price (+/- 4)
 const PRICE_RANGE_NUM_OF_STD_DEVS = 8;
 
 // The proportion of a standard deviation that a single bin represents
