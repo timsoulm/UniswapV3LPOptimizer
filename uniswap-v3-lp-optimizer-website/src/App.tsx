@@ -4,7 +4,7 @@ import './App.css';
 import { processPoolData } from './position-candidate-calculation';
 import { PositionCandidate, PoolLiquidityDistributions, CalculationConfigurationValues } from 'uniswap-v3-lp-optimizer-types';
 import { DefaultColumnFilter, GlobalFilter, singlePositionPerPoolFilter } from './filter-utils';
-import { getColumns, IntroContainer } from './components';
+import { getColumns, IntroContainer, TablePagination, TableLoadingComponent, TableBody, initialTableState } from './components';
 
 function App() {
   const [positionCandidates, setPositionCandidates] = useState<Array<PositionCandidate>>([]);
@@ -52,35 +52,7 @@ function App() {
     columns,
     data,
     defaultColumn,
-    initialState: {
-      hiddenColumns: [
-        'currentPrice'
-      ],
-      globalFilter: true,
-      filters: [
-        {
-          id: 'rangeLower',
-          value: -0.01
-        },
-        {
-          id: 'rangeUpper',
-          value: 0.01
-        },
-        {
-          id: 'probabilityPriceInRange',
-          value: 0.1
-        },
-        {
-          id: 'liquidityCoverageExpectedValue',
-          value: 0
-        },
-        {
-          id: 'estimatedAPY',
-          value: 0
-        },
-      ],
-      pageSize: 10
-    },
+    initialState: initialTableState,
     globalFilter: singlePositionPerPoolFilter
   }, useFilters, useGlobalFilter, useSortBy, usePagination);
 
@@ -113,17 +85,7 @@ function App() {
         setConfigurationValues={setConfigurationValues}
         setShouldCalculatePositions={setShouldCalculatePositions} />
       {
-        data.length === 0 ? <div className="table-loading-container">
-          <div className="table-loading-text">Calculating positions... (this can take a little bit)</div>
-          <div className="sk-chase">
-            <div className="sk-chase-dot"></div>
-            <div className="sk-chase-dot"></div>
-            <div className="sk-chase-dot"></div>
-            <div className="sk-chase-dot"></div>
-            <div className="sk-chase-dot"></div>
-            <div className="sk-chase-dot"></div>
-          </div>
-        </div> :
+        data.length === 0 ? <TableLoadingComponent /> :
           <>
             <div className="table-top-settings">
               <h4>Showing <strong>{globalFilteredRows.length}</strong> potential pool {globalFilteredRows.length === 1 ? 'position' : 'positions'}</h4>
@@ -132,59 +94,23 @@ function App() {
                 setGlobalFilter={setGlobalFilter}
               />
             </div>
-            <table {...getTableProps()} className="rwd-table">
-              <thead>
-                {headerGroups.map(headerGroup => (
-                  <tr {...headerGroup.getHeaderGroupProps()}>
-                    {headerGroup.headers.map(column => (
-                      <th {...column.getHeaderProps()}>
-                        <div className="table-header-container">
-                          <div {...column.getSortByToggleProps()}>
-                            {column.render('Header')}
-                            <span>
-                              {column.isSorted ? (column.isSortedDesc ? ' ▼' : ' ▲') : ''}
-                            </span>
-                          </div>
-                          <div>{column.canFilter ? column.render('Filter') : null}</div>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody {...getTableBodyProps()}>
-                {page.map((row, i) => {
-                  prepareRow(row)
-                  return (
-                    <tr {...row.getRowProps()}>
-                      {row.cells.map(cell => {
-                        return <td {...cell.getCellProps()}>{cell.render('Cell')}</td>
-                      })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div className="table-pagination">
-              <button onClick={() => gotoPage(0)} disabled={!canPreviousPage}>
-                {'<<'}
-              </button>{' '}
-              <button onClick={() => previousPage()} disabled={!canPreviousPage}>
-                {'<'}
-              </button>{' '}
-              <button onClick={() => nextPage()} disabled={!canNextPage}>
-                {'>'}
-              </button>{' '}
-              <button onClick={() => gotoPage(pageCount - 1)} disabled={!canNextPage}>
-                {'>>'}
-              </button>{' '}
-              <span>
-                Page{' '}
-                <strong>
-                  {pageIndex + 1} of {pageOptions.length}
-                </strong>{' '}
-              </span>
-            </div>
+            <TableBody
+              getTableProps={getTableProps}
+              headerGroups={headerGroups}
+              getTableBodyProps={getTableBodyProps}
+              page={page}
+              prepareRow={prepareRow}
+            />
+            <TablePagination
+              pageOptions={pageOptions}
+              pageCount={pageCount}
+              pageIndex={pageIndex}
+              gotoPage={gotoPage}
+              previousPage={previousPage}
+              nextPage={nextPage}
+              canPreviousPage={canPreviousPage}
+              canNextPage={canNextPage}
+            />
           </>
       }
     </div >
