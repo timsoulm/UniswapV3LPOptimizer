@@ -172,7 +172,7 @@ export function IntroContainer(props: {
             </div>
             <div className="intro-donation-section">
                 <p>
-                    Finding this site useful?
+                    Finding this site useful? Want to see more features?
                 </p>
                 <p><strong>BTC Donations:</strong> 39R2n93kXVKba2Uv9i4JbsPDDjYoz2jgGq</p>
                 <p><strong>ETH Donations:</strong> 0xcE109E4879D1B2765c8439b7FBaA2E7640fBE832</p>
