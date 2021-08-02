@@ -22,17 +22,18 @@ function convertBinIndexToPrice(index: number, binWidth: number, centerPrice: nu
 
 function getVolumeMethodology(configurationValues: CalculationConfigurationValues): string {
     let volumeMethodology;
-    if (configurationValues.volumeMethodology.timePeriod === 'daily') {
+    const lookbackPeriodDays = configurationValues.volumeMethodology.lookbackPeriodDays;
+    if (configurationValues.volumeMethodology.interval === 'daily') {
         if (configurationValues.volumeMethodology.aggregation === 'mean') {
-            volumeMethodology = 'AVG_DAILY_VOLUME';
+            volumeMethodology = lookbackPeriodDays === 7 ? 'AVG_L7_DAILY_VOLUME' : 'AVG_L3_DAILY_VOLUME';
         } else {
-            volumeMethodology = 'MEDIAN_DAILY_VOLUME';
+            volumeMethodology = lookbackPeriodDays === 7 ? 'MEDIAN_L7_DAILY_VOLUME' : 'MEDIAN_L3_DAILY_VOLUME';
         }
     } else {
         if (configurationValues.volumeMethodology.aggregation === 'mean') {
-            volumeMethodology = 'AVG_HOURLY_VOLUME';
+            volumeMethodology = lookbackPeriodDays === 7 ? 'AVG_L7_HOURLY_VOLUME' : 'AVG_L3_HOURLY_VOLUME';
         } else {
-            volumeMethodology = 'MEDIAN_HOURLY_VOLUME';
+            volumeMethodology = lookbackPeriodDays === 7 ? 'MEDIAN_L7_HOURLY_VOLUME' : 'MEDIAN_L3_HOURLY_VOLUME';
         }
     }
     return volumeMethodology;
@@ -47,14 +48,15 @@ function initializePoolLiquiditySummary(
 
     poolSummaries.forEach((poolSummary: any) => {
         // Set some pool volume requirements here to get better stability
-        if (poolSummary.AVG_DAILY_VOLUME < POOL_AVG_DAILY_VOLUME_THRESHOLD
+        if (poolSummary.AVG_L7_DAILY_VOLUME < POOL_AVG_DAILY_VOLUME_THRESHOLD
             // something wrong with this particular pool calc, investigate later
             || poolSummary.POOL_NAME === 'INST-WETH 3000 60') {
             return;
         }
 
         const dailyVolume =
-            volumeMethodology === 'AVG_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_HOURLY_VOLUME'
+            volumeMethodology === 'AVG_L7_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_L7_HOURLY_VOLUME'
+                || volumeMethodology === 'AVG_L3_HOURLY_VOLUME' || volumeMethodology === 'MEDIAN_L3_HOURLY_VOLUME'
                 ? poolSummary[volumeMethodology] * 24
                 : poolSummary[volumeMethodology];
 

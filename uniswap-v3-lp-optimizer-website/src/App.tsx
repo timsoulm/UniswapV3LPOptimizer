@@ -12,8 +12,9 @@ function App() {
   const [configurationValues, setConfigurationValues] = useState<CalculationConfigurationValues>({
     liquidityAmountProvided: 1000,
     volumeMethodology: {
-      timePeriod: 'daily',
-      aggregation: 'mean'
+      interval: 'hourly',
+      aggregation: 'median',
+      lookbackPeriodDays: 3
     }
   });
   const [shouldCalculatePositions, setShouldCalculatePositions] = useState<boolean>(true);

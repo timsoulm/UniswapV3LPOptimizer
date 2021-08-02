@@ -80,13 +80,15 @@ export function IntroContainer(props: {
     const setConfigurationValues = props.setConfigurationValues;
     const setShouldCalculatePositions = props.setShouldCalculatePositions;
 
-    function handleVolumeMethodologyChangeEvent(isTimePeriod: boolean) {
+    function handleVolumeMethodologyChangeEvent(propertyName: keyof CalculationConfigurationValues['volumeMethodology']) {
         return function (e: React.ChangeEvent<HTMLInputElement>) {
             const volumeMethodology = { ...configurationValues.volumeMethodology };
-            if (isTimePeriod) {
-                volumeMethodology.timePeriod = e.target.value as 'daily' | 'hourly';
-            } else {
+            if (propertyName === 'interval') {
+                volumeMethodology.interval = e.target.value as 'daily' | 'hourly';
+            } else if (propertyName === 'aggregation') {
                 volumeMethodology.aggregation = e.target.value as 'mean' | 'median';
+            } else {
+                volumeMethodology.lookbackPeriodDays = parseInt(e.target.value) as 3 | 7;
             }
             setConfigurationValues({
                 ...configurationValues,
@@ -115,33 +117,47 @@ export function IntroContainer(props: {
                             setShouldCalculatePositions(true);
                         }} />
                 </li>
-                <li>Volume estimation methodology:
+                <li>Historical volume methodology:
                     <form>
                         <ul>
                             <li>
                                 <input
                                     type='radio'
+                                    value={7}
+                                    checked={configurationValues.volumeMethodology.lookbackPeriodDays === 7}
+                                    onChange={handleVolumeMethodologyChangeEvent('lookbackPeriodDays')}
+                                /> Last 7 Days
+                                <input
+                                    type='radio'
+                                    value={3}
+                                    checked={configurationValues.volumeMethodology.lookbackPeriodDays === 3}
+                                    onChange={handleVolumeMethodologyChangeEvent('lookbackPeriodDays')}
+                                /> Last 3 Days
+                            </li>
+                            <li>
+                                <input
+                                    type='radio'
                                     value='daily'
-                                    checked={configurationValues.volumeMethodology.timePeriod === 'daily'}
-                                    onChange={handleVolumeMethodologyChangeEvent(true)} /> Daily
+                                    checked={configurationValues.volumeMethodology.interval === 'daily'}
+                                    onChange={handleVolumeMethodologyChangeEvent('interval')} /> Daily aggregation
                                 <input
                                     type='radio'
                                     value='hourly'
-                                    checked={configurationValues.volumeMethodology.timePeriod === 'hourly'}
-                                    onChange={handleVolumeMethodologyChangeEvent(true)} /> Hourly
+                                    checked={configurationValues.volumeMethodology.interval === 'hourly'}
+                                    onChange={handleVolumeMethodologyChangeEvent('interval')} /> Hourly aggregation
                             </li>
                             <li>
                                 <input
                                     type='radio'
                                     value='mean'
                                     checked={configurationValues.volumeMethodology.aggregation === 'mean'}
-                                    onChange={handleVolumeMethodologyChangeEvent(false)}
+                                    onChange={handleVolumeMethodologyChangeEvent('aggregation')}
                                 /> Mean
                                 <input
                                     type='radio'
                                     value='median'
                                     checked={configurationValues.volumeMethodology.aggregation === 'median'}
-                                    onChange={handleVolumeMethodologyChangeEvent(false)}
+                                    onChange={handleVolumeMethodologyChangeEvent('aggregation')}
                                 /> Median
                             </li>
                         </ul>

@@ -38,8 +38,9 @@ declare module 'uniswap-v3-lp-optimizer-types' {
     export type CalculationConfigurationValues = {
         liquidityAmountProvided: number,
         volumeMethodology: {
-            timePeriod: 'hourly' | 'daily'
-            aggregation: 'mean' | 'median'
+            interval: 'hourly' | 'daily',
+            aggregation: 'mean' | 'median',
+            lookbackPeriodDays: 3 | 7
         }
     }
 }
