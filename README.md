@@ -1,6 +1,8 @@
-# UniswapV3LPOptimizer
+# Uniswaptimizer
 
 The goal of this tool is to give Uniswap V3 users ideas for 'optimal' pool positions (by APY expected value) by using historial price volatility and the current pool liquidity distribution. It was largely inspired by the [Uniswap V3 fees calculator](https://uniswapv3.flipsidecrypto.com/) created by the Flipside team. However, this tool aims to take away a significant amount of manual work in locating positions, rather to allow users to tweak some investment settings (to be implemented soon) and automatically see a table of liquidity providing opportunities with start and end price points.
+
+To use the tool, visit [uniswaptimizer.com](https://www.uniswaptimizer.com)
 
 ![liquidity visualization](https://victorious-pebble-0c851121e.azurestaticapps.net/liquidityVisualization.svg)
 
